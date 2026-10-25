@@ -34,9 +34,9 @@ export default function Docs() {
     <div className="app docs">
       <header className="topbar">
         <a href="/" className="brand" style={{ textDecoration: "none" }}>STOCK<span>_QUANT</span></a>
-        <nav className="nav" aria-label="Sections"><a href="/">App</a><a href="/#spawn">Spawn</a><a href="/docs" aria-current="page">Docs</a></nav>
+        <nav className="nav" aria-label="Sections"><a href="/">Home</a><a href="/app">App</a><a href="/app#spawn">Spawn</a><a href="/docs" aria-current="page">Docs</a></nav>
         <div className="spacer" />
-        <a className="btn ghost" href="/#spawn" style={{ textDecoration: "none" }}>Spawn an agent</a>
+        <a className="btn ghost" href="/app#spawn" style={{ textDecoration: "none" }}>Spawn an agent</a>
       </header>
 
       <div className="docs-layout">

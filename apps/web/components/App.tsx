@@ -92,7 +92,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">STOCK<span>_QUANT</span></div>
+        <a href="/" className="brand" style={{ textDecoration: "none" }}>STOCK<span>_QUANT</span></a>
         <nav className="nav" aria-label="Sections"><a href="#floor">Agents</a><a href="#spawn">Spawn</a><a href="#markets">Markets</a><a href="/docs">Docs</a></nav>
         <div className="spacer" />
         <div className="clock">{state ? <>LIVE <b className="num">{hhmm(state.now)}</b></> : "connecting…"}</div>
