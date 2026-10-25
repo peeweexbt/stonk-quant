@@ -92,10 +92,11 @@ export default function Landing() {
       <header className="topbar l-top">
         <a href="/" className="brand" style={{ textDecoration: "none" }}>STOCK<span>_QUANT</span></a>
         <nav className="nav" aria-label="Sections">
-          <a href="#how">How it works</a><a href="#agents">Agents</a><a href="#universe">Universe</a><a href="#custody">Custody</a><a href="/docs">Docs</a>
+          <a href="#how">How it works</a><a href="#agents">Agents</a><a href="#universe">Universe</a><a href="#custody">Custody</a><a href="/docs">Docs</a><a href="/app">Floor</a>
         </nav>
         <div className="spacer" />
-        <a className="btn" href="/app" style={{ textDecoration: "none" }}>Launch app</a>
+        <a className="btn ghost" href="/app" style={{ textDecoration: "none" }}>Launch app</a>
+        <a className="btn" href="/app#spawn" style={{ textDecoration: "none" }}>Spawn agent</a>
       </header>
 
       {/* tape */}
