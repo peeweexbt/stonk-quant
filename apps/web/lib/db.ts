@@ -13,6 +13,7 @@ export function db() {
   globalThis.__sq_sql = postgres(url, {
     max: 3,
     idle_timeout: 20,
+    connect_timeout: 8,
     prepare: false,
     ssl: url.includes("localhost") || url.includes("railway.internal") ? false : "require",
   });

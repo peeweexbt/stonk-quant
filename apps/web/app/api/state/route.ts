@@ -13,6 +13,14 @@ function downsample(arr: number[], n: number) {
 }
 
 export async function GET() {
+  try { return await getState(); }
+  catch (e) {
+    console.error("[state]", e);
+    return json({ error: (e as Error).message }, 500, { "cache-control": "no-store" });
+  }
+}
+
+async function getState() {
   const sql = db();
   const [assets, ticks, agents, feed, totals] = await Promise.all([
     sql<{ mint: string; sym: string; name: string; kind: string; quote_sym: string | null; logo: string | null; mcap_usd: number | null }[]>`
