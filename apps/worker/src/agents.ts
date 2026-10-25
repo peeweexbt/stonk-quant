@@ -174,6 +174,10 @@ export async function runLive(ag: AgentRow, minute: number) {
   // While price history is still warming up, check again in ~5 minutes.
   const nextOffsetMin = allOrders.length > orders.length ? Math.max(0, cadenceMinutes(ag) - 2) : t.warming ? Math.max(0, cadenceMinutes(ag) - 5) : 0;
 
+  // Tell the owner when the vault is too small for the positions the strategy wants.
+  const eqNow = s.cash + Object.values(s.values).reduce((a, b) => a + b, 0);
+  const tooSmall = !allOrders.length && Object.entries(t.w).some(([m, w]) => w > 0 && !(s.values[m] > 0) && w * eqNow < LIMITS.minTradeUsd);
+  if (tooSmall) t.note += ` · vault too small: positions would be under the $${LIMITS.minTradeUsd} minimum trade, top up to trade`;
   const noteChanged = t.note !== state.lastNote;
   if (noteChanged || !state.lastThinkAt || Date.now() - state.lastThinkAt > 30 * 60_000) {
     await logEvent(ag.id, "think", orders.length ? t.note : `${t.note} · no rebalance needed`);
