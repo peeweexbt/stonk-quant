@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { KIND_LABEL, LIMITS, POSITION_CAP, STRATS, STRAT_KEYS, exposure, type AssetKind } from "@stonkquant/core";
+import { KIND_LABEL, LIMITS, MIN_HOLD_MIN, POSITION_CAP, RISK_RULES, STRATS, STRAT_KEYS, exposure, type AssetKind } from "@stonkquant/core";
 import { spriteText } from "@/components/sprite-text";
 
 export const metadata: Metadata = {
@@ -112,6 +112,10 @@ export default function Docs() {
               <li><b>Position caps:</b> no single asset can exceed {(["xstock", "prestock", "stonk", "pair", "pump", "otc"] as AssetKind[]).map((k) => `${Math.round(POSITION_CAP[k] * 100)}% (${KIND_LABEL[k]})`).join(", ")} of the vault.</li>
               <li><b>Rebalance speed:</b> <em>Fast</em> checks twice as often as normal, <em>Patient</em> 2.5× less often (fewer trades, lower fees).</li>
               <li><b>Drift bands:</b> agents only trade when a position is meaningfully off target, so they don't churn on tiny moves. Trades under ${LIMITS.minTradeUsd} are skipped.</li>
+              <li><b>Stop-losses:</b> checked every minute. A position is closed if it falls {(["xstock", "prestock", "stonk", "pair"] as AssetKind[]).map((k) => `${Math.round(RISK_RULES[k].stop * 100)}% (${k === "pair" ? "launchpad coins" : KIND_LABEL[k]})`).join(", ")} below its entry, then the asset is benched for 6 hours.</li>
+              <li><b>Trailing take-profit:</b> once a position is up by its arm level (e.g. {Math.round(RISK_RULES.xstock.arm * 100)}% on xStocks), it's sold if it gives back {Math.round(RISK_RULES.xstock.trail * 100)}% from its high.</li>
+              <li><b>Minimum hold:</b> Momentum holds new positions at least {MIN_HOLD_MIN.MOMENTUM / 60}h and Reversion {MIN_HOLD_MIN.MEANREV / 60}h (risk exits excepted), so a flickering signal doesn't burn fees.</li>
+              <li><b>Risk-off:</b> when SPYx is falling over 4 hours, agents halve their exposure to everything except xStocks.</li>
               <li>You can change risk or pause an agent from its desk at any time. A paused agent keeps its positions but stops trading.</li>
             </ul>
           </section>
@@ -161,7 +165,7 @@ export default function Docs() {
             <details><summary>Can I add more USDC later?</summary><p>Yes. Open the desk and use <em>Top up</em>. Deposits made through the app count toward your P&amp;L baseline. Funds sent to the vault from elsewhere still work, but aren't counted as a deposit.</p></details>
             <details><summary>What happens if a trade fails?</summary><p>It's logged in red on the desk and retried on the next rebalance. Nothing is lost; the USDC simply stays in the vault.</p></details>
             <details><summary>Does a tokenized stock make me a shareholder?</summary><p>No. Tokenized stocks and stock-paired coins track prices but carry no voting, dividend or ownership rights in the company.</p></details>
-            <details><summary>What are the SIM agents on the floor?</summary><p>They're simulated agents, one per strategy, that paper-trade on the same live prices with $1,000 of pretend USDC. They show how each strategy behaves. They hold no funds, never trade on-chain, and are left out of the platform totals (assets, P&amp;L, trades, volume). They're always tagged SIM with a dashed border.</p></details>
+            <details><summary>What are the SIM agents on the floor?</summary><p>They're simulated agents, one per strategy, that paper-trade on the same live prices with $1,000 of pretend USDC. They run conservative presets (low risk, patient rebalancing, liquid assets) that any real agent can also choose, and the same risk rules as real agents. They show how each strategy behaves, including when it loses. They hold no funds, never trade on-chain, and are left out of the platform totals (assets, P&amp;L, trades, volume). They're always tagged SIM with a dashed border.</p></details>
             <details><summary>Who can see my agent?</summary><p>Everyone. The floor shows every agent, its strategy and P&amp;L, and the vault address is public on Solana. Only you can control it or withdraw from it.</p></details>
           </section>
 

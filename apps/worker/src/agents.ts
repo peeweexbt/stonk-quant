@@ -12,6 +12,7 @@ import { market } from "./market";
 import { connection, getBalances, priorityIx, signAndSend, type Balances } from "./solana";
 import { buildSwap, getQuote } from "./jupiter";
 import { createAgentWallet, createWithdrawPolicy } from "./turnkey";
+import { needsRiskExit, startCooldowns, updatePeaks } from "./risk";
 
 export interface AgentRow {
   id: number;
@@ -29,7 +30,7 @@ export interface AgentRow {
   equity_usd: number;
   cash_usd: number;
   holdings: Record<string, Holding>;
-  state: { entry?: Record<string, number>; lastThinkAt?: number; lastNote?: string };
+  state: { entry?: Record<string, number>; peak?: Record<string, number>; cooldown?: Record<string, number>; entryAt?: Record<string, number>; lastThinkAt?: number; lastNote?: string };
   note: string | null;
   trades: number;
   volume_usd: number;
@@ -163,11 +164,19 @@ export async function runLive(ag: AgentRow, minute: number) {
     return;
   }
 
-  const due = !ag.last_rebalance_at || Date.now() - new Date(ag.last_rebalance_at).getTime() >= cadenceMinutes(ag) * 60_000 - 5_000;
-  if (!due) { await saveSnapshot(ag, s, recordEquity); return; }
+  const state = { ...ag.state, entry: { ...(ag.state.entry ?? {}) }, peak: { ...(ag.state.peak ?? {}) }, cooldown: { ...(ag.state.cooldown ?? {}) }, entryAt: { ...(ag.state.entryAt ?? {}) } };
+  const peaksChanged = updatePeaks(state, s.values, (m) => market.price(m));
+  const view = { strat: ag.strat, risk: ag.risk, uni: ag.uni, values: s.values, cash: s.cash, entry: state.entry, peak: state.peak, cooldown: state.cooldown, entryAt: state.entryAt };
+  // Stop-losses and trailing take-profits are checked every minute, not just at rebalance time.
+  const due = !ag.last_rebalance_at || Date.now() - new Date(ag.last_rebalance_at).getTime() >= cadenceMinutes(ag) * 60_000 - 5_000 || needsRiskExit(view, market.view());
+  if (!due) {
+    if (peaksChanged) await sql`UPDATE agents SET state = ${sql.json(state as any)} WHERE id = ${ag.id}`;
+    await saveSnapshot({ ...ag, state }, s, recordEquity);
+    return;
+  }
 
-  const state = { ...ag.state, entry: { ...(ag.state.entry ?? {}) } };
-  const t = computeTargets({ strat: ag.strat, risk: ag.risk, uni: ag.uni, values: s.values, entry: state.entry }, market.view());
+  const t = computeTargets(view, market.view());
+  startCooldowns(state, t.exits.map((x) => x.mint));
   const allOrders = planOrders(s.values, s.cash, t, LIMITS.minTradeUsd, 999);
   const orders = allOrders.slice(0, LIMITS.maxOrdersPerRebalance);
   // If we had to cap the order count, come back in ~2 minutes instead of a full cadence.
@@ -221,6 +230,7 @@ export async function runLive(ag: AgentRow, minute: number) {
           const fill = boughtUi > 0 ? spent / boughtUi : price;
           const prevEntry = state.entry[o.mint] ?? fill;
           state.entry[o.mint] = (prevEntry * prevUi + fill * boughtUi) / Math.max(1e-12, prevUi + boughtUi);
+          if (!(prevUi > 0)) state.entryAt[o.mint] = Date.now();
           await logEvent(ag.id, "buy", `BUY ${qty(boughtUi)} ${sym} @ ${px(fill)} for ${usd(spent)}`, r.sig);
           volume += spent;
         }

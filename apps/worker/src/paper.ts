@@ -1,9 +1,10 @@
 // Simulated agents: same strategies, same live prices, paper fills. They hold no funds and never touch the chain.
-import { STRATS, STRAT_KEYS, computeTargets, planOrders, LIMITS, type AssetKind, type StratKey } from "@stonkquant/core";
+import { STRAT_KEYS, STRATS, computeTargets, planOrders, LIMITS, type AssetKind, type StratKey } from "@stonkquant/core";
 import { sql, logEvent } from "./db";
 import { env } from "./env";
 import { market } from "./market";
 import type { AgentRow, Holding } from "./agents";
+import { needsRiskExit, startCooldowns, updatePeaks } from "./risk";
 
 export const SIM_OWNER = "simulated";
 
@@ -12,13 +13,27 @@ interface Paper { cash: number; qty: Record<string, number> }
 const SIM_NAMES: Record<StratKey, string> = {
   MOMENTUM: "SIM-MONK", MEANREV: "SIM-GOBLIN", INDEX: "SIM-HUGGER", PREIPO: "SIM-PROPHET", SNIPER: "SIM-SNIPER", BURNER: "SIM-FARMER",
 };
-const SIM_RISK: Record<StratKey, number> = { MOMENTUM: 6, MEANREV: 5, INDEX: 8, PREIPO: 7, SNIPER: 9, BURNER: 6 };
+// Conservative presets: lower risk, patient rebalancing (fewer fees), liquid assets only.
+// Every rule here is available to real agents too (same risk dial, cadence and universe options).
+const SIM_PROFILE: Record<StratKey, { risk: number; cad: number; uni: AssetKind[] }> = {
+  MOMENTUM: { risk: 4, cad: 2.5, uni: ["xstock", "prestock", "stonk"] },
+  MEANREV: { risk: 4, cad: 2.5, uni: ["xstock", "prestock"] },
+  INDEX: { risk: 6, cad: 2.5, uni: ["xstock"] },
+  PREIPO: { risk: 4, cad: 2.5, uni: ["prestock"] },
+  SNIPER: { risk: 3, cad: 1, uni: ["pair"] },
+  BURNER: { risk: 3, cad: 2.5, uni: ["stonk", "pair"] },
+};
 
 /** Create (or retire) the simulated agents to match SIM_AGENTS. */
 export async function ensureSimAgents() {
   await sql`INSERT INTO users (wallet) VALUES (${SIM_OWNER}) ON CONFLICT DO NOTHING`;
   const want = Math.max(0, Math.min(STRAT_KEYS.length * 3, env.sim.count));
-  const live = await sql<{ id: number }[]>`SELECT id FROM agents WHERE sim AND status <> 'retired' ORDER BY id`;
+  const live = await sql<{ id: number; strat: StratKey }[]>`SELECT id, strat FROM agents WHERE sim AND status <> 'retired' ORDER BY id`;
+  // keep existing sims on the current conservative presets
+  for (const a of live) {
+    const p = SIM_PROFILE[a.strat];
+    if (p) await sql`UPDATE agents SET risk = ${p.risk}, cadence_mul = ${p.cad}, uni = ${p.uni as string[]} WHERE id = ${a.id}`;
+  }
   if (want === 0) {
     if (live.length) await sql`UPDATE agents SET status = 'retired', updated_at = now() WHERE sim AND status <> 'retired'`;
     return;
@@ -31,7 +46,7 @@ export async function ensureSimAgents() {
     const state = { paper: { cash: deposit, qty: {} } };
     const [row] = await sql<{ id: number }[]>`
       INSERT INTO agents (owner, name, strat, risk, cadence_mul, uni, color, status, sim, deposited_usd, equity_usd, cash_usd, state)
-      VALUES (${SIM_OWNER}, ${name}, ${strat}, ${SIM_RISK[strat]}, 1, ${STRATS[strat].uni as string[]}, ${i % 6}, 'live', true, ${deposit}, ${deposit}, ${deposit}, ${sql.json(state as any)})
+      VALUES (${SIM_OWNER}, ${name}, ${strat}, ${SIM_PROFILE[strat].risk}, ${SIM_PROFILE[strat].cad}, ${SIM_PROFILE[strat].uni as string[]}, ${i % 6}, 'live', true, ${deposit}, ${deposit}, ${deposit}, ${sql.json(state as any)})
       ON CONFLICT DO NOTHING RETURNING id`;
     if (row) await logEvent(row.id, "boot", `simulated agent spawned with $${deposit} of paper USDC (no real funds)`);
   }
@@ -60,17 +75,21 @@ function snapshot(paper: Paper, entry: Record<string, number>) {
 export async function runPaper(ag: AgentRow, minute: number) {
   const st = (ag.state ?? {}) as AgentRow["state"] & { paper?: Paper };
   const paper: Paper = st.paper ? { cash: st.paper.cash, qty: { ...st.paper.qty } } : { cash: ag.deposited_usd || env.sim.deposit, qty: {} };
-  const state = { ...st, entry: { ...(st.entry ?? {}) }, paper };
+  const state = { ...st, entry: { ...(st.entry ?? {}) }, peak: { ...(st.peak ?? {}) }, cooldown: { ...(st.cooldown ?? {}) }, entryAt: { ...(st.entryAt ?? {}) }, paper };
+  const pre = snapshot(paper, state.entry);
+  const peaksChanged = updatePeaks(state, pre.values, (m) => market.price(m));
+  const view = () => ({ strat: ag.strat, risk: ag.risk, uni: ag.uni, values: snapshot(paper, state.entry).values, cash: paper.cash, entry: state.entry, peak: state.peak, cooldown: state.cooldown, entryAt: state.entryAt });
   let trades = 0, volume = 0, rebalanced = false;
 
   const cad = Math.max(1, Math.round(STRATS[ag.strat].cad * (ag.cadence_mul || 1)));
-  const due = ag.status === "live" && (!ag.last_rebalance_at || Date.now() - new Date(ag.last_rebalance_at).getTime() >= cad * 60_000 - 5_000);
+  const due = ag.status === "live" && (!ag.last_rebalance_at || Date.now() - new Date(ag.last_rebalance_at).getTime() >= cad * 60_000 - 5_000 || needsRiskExit(view(), market.view()));
   let nextOffsetMin = 0;
 
   if (due) {
     rebalanced = true;
     const s = snapshot(paper, state.entry);
-    const t = computeTargets({ strat: ag.strat, risk: ag.risk, uni: ag.uni, values: s.values, entry: state.entry }, market.view());
+    const t = computeTargets(view(), market.view());
+    startCooldowns(state, t.exits.map((x) => x.mint));
     const all = planOrders(s.values, paper.cash, t, LIMITS.minTradeUsd, 999);
     const orders = all.slice(0, LIMITS.maxOrdersPerRebalance);
     if (all.length > orders.length) nextOffsetMin = Math.max(0, cad - 2);
@@ -106,6 +125,7 @@ export async function runPaper(ag: AgentRow, minute: number) {
         const prevQ = paper.qty[o.mint] ?? 0;
         state.entry[o.mint] = ((state.entry[o.mint] ?? fill) * prevQ + fill * q) / (prevQ + q);
         paper.qty[o.mint] = prevQ + q;
+        if (!(prevQ > 0)) state.entryAt[o.mint] = Date.now();
         paper.cash -= spend;
         await logEvent(ag.id, "buy", `BUY ${qtyFmt(q)} ${sym} @ ${px(fill)} for ${fmt(spend)} · paper`);
         volume += spend;
@@ -115,6 +135,7 @@ export async function runPaper(ag: AgentRow, minute: number) {
   }
 
   const s = snapshot(paper, state.entry);
+  if (!rebalanced && peaksChanged) await sql`UPDATE agents SET state = ${sql.json(state as any)} WHERE id = ${ag.id}`;
   if (rebalanced) {
     await sql`UPDATE agents SET state = ${sql.json(state as any)}, note = ${state.lastNote ?? null},
       last_rebalance_at = now() - make_interval(mins => ${nextOffsetMin}), trades = trades + ${trades}, volume_usd = volume_usd + ${volume}, updated_at = now() WHERE id = ${ag.id}`;

@@ -38,6 +38,59 @@ export interface AgentView {
   values: Record<string, number>;
   /** volume-weighted entry price per mint */
   entry: Record<string, number>;
+  /** highest price seen per held mint since entry (for trailing take-profit) */
+  peak?: Record<string, number>;
+  /** mints the agent recently exited on a risk rule, epoch ms until it may re-enter */
+  cooldown?: Record<string, number>;
+  /** epoch ms when each position was opened */
+  entryAt?: Record<string, number>;
+  /** USDC on hand (needed to turn position values into weights) */
+  cash?: number;
+}
+
+/** Minimum minutes a strategy holds a new position before it may sell it (risk exits excepted). Cuts fee churn. */
+export const MIN_HOLD_MIN: Record<StratKey, number> = { MOMENTUM: 240, MEANREV: 120, INDEX: 0, PREIPO: 0, SNIPER: 0, BURNER: 0 };
+
+/* ---------------- risk overlay (applies to every agent, real and simulated) ---------------- */
+
+/** stop-loss, take-profit arm level and trailing give-back per asset type */
+export const RISK_RULES: Record<AssetKind, { stop: number; arm: number; trail: number }> = {
+  // Wide on purpose: tight stops on noisy assets just lock in losses and pay fees.
+  xstock: { stop: 0.07, arm: 0.06, trail: 0.03 },
+  prestock: { stop: 0.12, arm: 0.12, trail: 0.06 },
+  stonk: { stop: 0.18, arm: 0.25, trail: 0.1 },
+  pair: { stop: 0.25, arm: 0.4, trail: 0.15 },
+  pump: { stop: 0.25, arm: 0.4, trail: 0.15 },
+  otc: { stop: 0.25, arm: 0.4, trail: 0.15 },
+};
+export const RISK_COOLDOWN_MS = 6 * 3600_000;
+const SPY_MINT = "XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W";
+
+export interface RiskExit { mint: string; reason: string }
+
+/** Positions that must be closed now: stop-loss hit, or a winner gave back its trailing buffer. */
+export function riskExits(ag: AgentView, market: MarketAsset[]): RiskExit[] {
+  const out: RiskExit[] = [];
+  const byMint = new Map(market.map((a) => [a.mint, a]));
+  for (const [m, v] of Object.entries(ag.values)) {
+    if (!(v > 1)) continue;
+    const a = byMint.get(m);
+    const e = ag.entry[m];
+    if (!a || !e) continue;
+    const p = last(a), rule = RISK_RULES[a.kind];
+    const pk = Math.max(ag.peak?.[m] ?? p, p);
+    const pnl = p / e - 1;
+    if (pnl <= -rule.stop) out.push({ mint: m, reason: `stop-loss ${a.sym} at ${pct(pnl)}` });
+    else if (pk / e - 1 >= rule.arm && p / pk - 1 <= -rule.trail) out.push({ mint: m, reason: `took profit on ${a.sym} at ${pct(pnl)}` });
+  }
+  return out;
+}
+
+/** Broad market is falling: SPYx below its 4h mean and down over 4h. */
+function riskOff(market: MarketAsset[]) {
+  const spy = market.find((a) => a.mint === SPY_MINT);
+  if (!spy || spy.h.length < 240) return false;
+  return ret(spy, 240) < -0.005 && last(spy) < sma(spy, 240);
 }
 
 export interface TargetResult {
@@ -78,11 +131,37 @@ export const MIN_HISTORY = 30;
 /** Per-position caps (fraction of equity) so no single coin dominates a vault. */
 export const POSITION_CAP: Record<AssetKind, number> = { xstock: 0.5, prestock: 0.4, stonk: 0.4, pair: 0.2, pump: 0.15, otc: 0.15 };
 
-export function computeTargets(ag: AgentView, market: MarketAsset[]): TargetResult {
-  const r = rawTargets(ag, market);
+export function computeTargets(ag: AgentView, market: MarketAsset[]): TargetResult & { exits: RiskExit[] } {
+  const now = Date.now();
+  // assets on cooldown after a risk exit are invisible to the strategy
+  const cooled = new Set(Object.entries(ag.cooldown ?? {}).filter(([, until]) => until > now).map(([m]) => m));
+  const visible = cooled.size ? market.filter((a) => !cooled.has(a.mint) || (ag.values[a.mint] ?? 0) > 1) : market;
+  const r = rawTargets(ag, visible);
   const kinds = new Map(market.map((a) => [a.mint, a.kind]));
   for (const m in r.w) r.w[m] = Math.min(r.w[m], POSITION_CAP[kinds.get(m) ?? "pair"]);
-  return r;
+  for (const m of cooled) delete r.w[m];
+
+  const notes: string[] = [];
+  const exits = riskExits(ag, market);
+  // honour the minimum holding period: don't sell a young position just because the signal flickered
+  const hold = MIN_HOLD_MIN[ag.strat] * 60_000;
+  if (hold) {
+    const eq = (ag.cash ?? 0) + Object.values(ag.values).reduce((s, v) => s + v, 0);
+    for (const [m, v] of Object.entries(ag.values)) {
+      const at = ag.entryAt?.[m];
+      if (eq > 0 && v > 1 && at && now - at < hold && !exits.some((x) => x.mint === m)) {
+        r.w[m] = Math.max(r.w[m] ?? 0, Math.min(POSITION_CAP[kinds.get(m) ?? "pair"], v / eq));
+      }
+    }
+  }
+  for (const x of exits) { r.w[x.mint] = 0; notes.push(x.reason); }
+
+  if (riskOff(market) && ag.strat !== "INDEX") {
+    for (const m in r.w) { const k = kinds.get(m); if (k && k !== "xstock") r.w[m] *= 0.5; }
+    notes.push("market risk-off: halving non-stock exposure");
+  }
+  if (notes.length) r.note = `${notes.join(" · ")} · ${r.note}`;
+  return { ...r, exits };
 }
 
 function rawTargets(ag: AgentView, market: MarketAsset[]): TargetResult {
@@ -97,22 +176,28 @@ function rawTargets(ag: AgentView, market: MarketAsset[]): TargetResult {
 
   switch (ag.strat) {
     case "MOMENTUM": {
-      const r = U.map((a) => [a, ret(a, 60)] as const).filter((x) => x[1] > 0.002).sort((a, b) => b[1] - a[1]).slice(0, 3);
+      // Hold winners while their hourly trend stays positive; only add a new name on a clear trend.
+      // Equal weights + a wide band keep turnover (and fees) low.
+      const held = U.filter((a) => (ag.values[a.mint] ?? 0) > 1 && ret(a, 60) > -0.004 && ret(a, 120) > -0.006);
+      const fresh = U.filter((a) => !held.includes(a) && ret(a, 60) > 0.008 && ret(a, 120) > 0.008 && ret(a, 15) > 0)
+        .sort((a, b) => ret(b, 60) - ret(a, 60)).slice(0, Math.max(0, 3 - held.length));
+      const pick = [...held, ...fresh].slice(0, 3);
       const raw: Record<string, number> = {};
-      r.forEach(([a, v]) => (raw[a.mint] = v));
+      pick.forEach((a) => (raw[a.mint] = 1));
       norm(raw);
-      return { w, band: 0.03, note: r.length ? `leaders ${r.map(([a, v]) => `${a.sym} ${pct(v)}`).join(", ")} over 60m` : "no positive trend, sitting in USDC" };
+      return { w, band: 0.08, note: pick.length ? `riding ${pick.map((a) => `${a.sym} ${pct(ret(a, 60))}`).join(", ")} over 60m` : "no clear trend, sitting in USDC" };
     }
     case "MEANREV": {
+      // Buy only real stretches (≤ -1.2σ), hold until price is back to its mean, then exit.
       const z = U.map((a) => [a, (last(a) / sma(a, 120) - 1) / (stdRet(a, 120) * Math.sqrt(120))] as const);
-      const cands = z.filter((x) => x[1] < -0.6).sort((a, b) => a[1] - b[1]).slice(0, 3);
+      const holding = z.filter(([a, v]) => (ag.values[a.mint] ?? 0) > 1 && v < 0);
+      const fresh = z.filter(([a, v]) => !((ag.values[a.mint] ?? 0) > 1) && v < -1.2).sort((a, b) => a[1] - b[1]).slice(0, Math.max(0, 3 - holding.length));
+      const pick = [...holding, ...fresh].slice(0, 3);
       const raw: Record<string, number> = {};
-      cands.forEach(([a, v]) => (raw[a.mint] = -v));
-      // keep holding names that are still below their mean
-      z.forEach(([a, v]) => { if ((ag.values[a.mint] || 0) > 1 && v < 0 && !raw[a.mint]) raw[a.mint] = 0.3; });
+      pick.forEach(([a]) => (raw[a.mint] = 1));
       norm(raw);
       const worst = z.slice().sort((a, b) => a[1] - b[1])[0];
-      return { w, band: 0.03, note: cands.length ? `${cands[0][0].sym} stretched ${cands[0][1].toFixed(1)}σ below its 2h mean` : `nothing stretched; widest ${worst[0].sym} at ${worst[1].toFixed(1)}σ` };
+      return { w, band: 0.08, note: fresh.length ? `${fresh[0][0].sym} stretched ${fresh[0][1].toFixed(1)}σ below its 2h mean` : holding.length ? `holding ${holding.map(([a]) => a.sym).join(", ")} until they revert` : `nothing stretched; widest ${worst[0].sym} at ${worst[1].toFixed(1)}σ` };
     }
     case "INDEX": {
       const raw: Record<string, number> = {};
