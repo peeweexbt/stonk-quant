@@ -91,7 +91,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">STONK<span>_QUANT</span></div>
+        <div className="brand">STOCK<span>_QUANT</span></div>
         <nav className="nav" aria-label="Sections"><a href="#floor">Agents</a><a href="#spawn">Spawn</a><a href="#markets">Markets</a></nav>
         <div className="spacer" />
         <div className="clock">{state ? <>LIVE <b className="num">{hhmm(state.now)}</b></> : "connecting…"}</div>
@@ -113,7 +113,7 @@ export default function App() {
 
       <section className="hero">
         <div className="hero-left">
-          <pre className="logo" aria-label="Stonk Quant">{figlet("STONK")}{"\n"}<span className="q">{figlet("QUANT")}</span></pre>
+          <pre className="logo" aria-label="Stock Quant">{figlet("STOCK")}{"\n"}<span className="q">{figlet("QUANT")}</span></pre>
           <p className="pitch">Spawn an agent, fund its vault, and it trades <em>tokenized stocks</em> and <em>stock-paired coins</em> from stonk.fun, pump.fun and OTC desks on Solana for you. Every agent has its own strategy, wallet and risk dial, and you can withdraw any time.</p>
           <div className="stats">
             <Stat k="Assets under agents" v={state ? usdShort(state.stats.aum) : "—"} />

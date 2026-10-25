@@ -1,4 +1,4 @@
-# Stonk Quant
+# Stock Quant
 
 Agent launchpad on Solana. Users connect Phantom, spawn an ASCII agent with a strategy and risk dial, fund its own vault with USDC + a little SOL, and the agent trades tokenized stocks (xStocks), pre-IPO tokens (PreStocks), STONK and the liquid launchpad coins tied to them: stonk.fun pairs, pump.fun custom pairs, and OTC desk coins that pay holders in stocks. Owners can pause, change risk, top up, or withdraw everything back to their wallet at any time.
 

@@ -76,7 +76,7 @@ async function discoveryLoop() {
 }
 
 async function main() {
-  console.log(`stonk-quant worker starting. trading=${env.tradingEnabled} withdrawals=${env.withdrawalsEnabled} jupiter=${env.jupiter.baseUrl}`);
+  console.log(`stock-quant worker starting. trading=${env.tradingEnabled} withdrawals=${env.withdrawalsEnabled} jupiter=${env.jupiter.baseUrl}`);
   await migrate();
   await market.loadAssets();
   await market.loadHistory();

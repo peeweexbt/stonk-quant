@@ -2,8 +2,8 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
-  title: "Stonk Quant",
-  description: "Agents that buy and manage tokenized stocks and stock-paired coins across the stonk.fun ecosystem on Solana.",
+  title: "Stock Quant",
+  description: "Agents that buy and manage tokenized stocks and stock-paired launchpad coins (stonk.fun, pump.fun, OTC desks) on Solana.",
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#05090b" };

@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   const nonce = randomUUID().replace(/-/g, "");
   const host = new URL(req.url).host;
   const message = [
-    `${host} wants you to sign in to Stonk Quant with your Solana account:`,
+    `${host} wants you to sign in to Stock Quant with your Solana account:`,
     wallet,
     "",
     "This signature proves you own this wallet. It does not move funds or cost gas.",
