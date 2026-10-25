@@ -1,0 +1,21 @@
+{
+  "name": "stonk-quant",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w @stonkquant/web",
+    "dev:worker": "npm run dev -w @stonkquant/worker",
+    "build:web": "npm run build -w @stonkquant/web",
+    "start:worker": "npm run start -w @stonkquant/worker",
+    "migrate": "npm run migrate -w @stonkquant/worker",
+    "setup:turnkey": "npm run setup:turnkey -w @stonkquant/worker",
+    "typecheck": "npm run typecheck -w @stonkquant/core && npm run typecheck -w @stonkquant/worker && npm run typecheck -w @stonkquant/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
