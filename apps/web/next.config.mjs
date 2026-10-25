@@ -1,10 +1,16 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@stonkquant/core"],
   experimental: {
-    // keep the postgres driver out of the bundle
-    serverComponentsExternalPackages: ["postgres"],
+    // Monorepo: trace server dependencies from the repo root so hoisted packages
+    // (postgres, jose, @solana/*) are included in the Vercel functions.
+    outputFileTracingRoot: path.join(here, "../../"),
   },
   async headers() {
     return [
