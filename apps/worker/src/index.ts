@@ -67,12 +67,16 @@ async function fastLoop() {
   } finally { fastRunning = false; }
 }
 
+let discoveryRunning = false;
 async function discoveryLoop() {
+  if (discoveryRunning) return; // a slow pass shouldn't stack up behind the next one
+  discoveryRunning = true;
   try {
     const n = await discoverPairs();
     await market.loadAssets();
     console.log(`[discovery] stonk.fun ${n.pair ?? "-"} · pump.fun ${n.pump ?? "-"} · OTC ${n.otc ?? "-"} coins in universe`);
   } catch (e) { console.error("[discovery]", e); }
+  finally { discoveryRunning = false; }
 }
 
 async function main() {
@@ -85,7 +89,7 @@ async function main() {
   // align the minute loop to the top of each minute
   setTimeout(() => { minuteLoop(); setInterval(minuteLoop, 60_000); }, 60_000 - (Date.now() % 60_000) + 2_000);
   setInterval(fastLoop, 10_000);
-  setInterval(discoveryLoop, 15 * 60_000);
+  setInterval(discoveryLoop, Math.max(30, env.discovery.intervalSec) * 1000);
   fastLoop();
 }
 

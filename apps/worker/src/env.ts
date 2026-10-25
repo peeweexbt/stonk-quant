@@ -31,6 +31,7 @@ export const env = {
     minMcapUsd: Number(opt("DISCOVERY_MIN_MCAP_USD", "100000")),
     minVol24hUsd: Number(opt("DISCOVERY_MIN_VOL24H_USD", "5000")),
     max: Number(opt("DISCOVERY_MAX_PAIRS", "24")),
+    intervalSec: Number(opt("DISCOVERY_INTERVAL_SEC", "60")),
     pump: opt("DISCOVERY_PUMP", "true") === "true",
     // pump.fun custom pairs and OTC coins are much smaller than stonk.fun pairs, so they get their own floors
     pumpMinMcapUsd: Number(opt("DISCOVERY_PUMP_MIN_MCAP_USD", "30000")),

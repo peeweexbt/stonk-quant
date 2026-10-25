@@ -105,17 +105,26 @@ async function fromOtc(): Promise<Candidate[]> {
 }
 
 /* ---------- routability (can Jupiter actually trade it?) ---------- */
-const routeCache = new Map<string, { ok: boolean; at: number }>();
-async function routable(mint: string): Promise<boolean> {
+// "no": Jupiter says there's no route. "unknown": rate limit / network error, so don't drop the coin over it.
+const routeCache = new Map<string, { ok: boolean; at: number; ttl: number }>();
+async function routable(mint: string): Promise<boolean | "unknown"> {
   const hit = routeCache.get(mint);
-  if (hit && Date.now() - hit.at < 6 * 3600_000) return hit.ok;
-  let ok = false;
+  if (hit && Date.now() - hit.at < hit.ttl) return hit.ok;
+  await new Promise((r) => setTimeout(r, 400)); // pace test quotes so we don't trip Jupiter's rate limit
   try {
     const q = await getQuote(USDC_MINT, mint, 10_000_000n, 500); // $10 test route
-    ok = BigInt(q.outAmount) > 0n && Number(q.priceImpactPct) * 100 < 5;
-  } catch { ok = false; }
-  routeCache.set(mint, { ok, at: Date.now() });
-  return ok;
+    const ok = BigInt(q.outAmount) > 0n && Number(q.priceImpactPct) * 100 < 5;
+    routeCache.set(mint, { ok, at: Date.now(), ttl: 6 * 3600_000 });
+    return ok;
+  } catch (e) {
+    const msg = (e as Error).message;
+    if (/ 400:|ROUTE|NOT_TRADABLE|TOKEN_NOT/i.test(msg)) {
+      routeCache.set(mint, { ok: false, at: Date.now(), ttl: 3600_000 });
+      return false;
+    }
+    console.warn("[discovery:route]", mint.slice(0, 6), msg.slice(0, 120));
+    return "unknown";
+  }
 }
 
 async function upsert(c: Candidate) {
@@ -149,10 +158,13 @@ export async function discoverPairs(): Promise<Record<string, number>> {
       if (!prev || c.mcap > prev.mcap) best.set(c.mint, c);
     }
     const ranked = [...best.values()].sort((a, b) => b.mcap - a.mcap);
+    const wasActive = new Set((await sql<{ mint: string }[]>`SELECT mint FROM assets WHERE kind = ${src.kind} AND active`).map((r) => r.mint));
     const keep: Candidate[] = [];
     for (const c of ranked) {
       if (keep.length >= src.max()) break;
-      if (await routable(c.mint)) keep.push(c);
+      const r = await routable(c.mint);
+      // keep coins we couldn't check (rate limit) if they were already in the universe
+      if (r === true || (r === "unknown" && wasActive.has(c.mint))) keep.push(c);
     }
     for (const c of keep) { await upsert(c); claimed.add(c.mint); }
     const mints = keep.map((c) => c.mint);
