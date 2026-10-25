@@ -15,9 +15,10 @@ interface Agent {
   deposited_usd: number; withdrawn_usd: number; equity_usd: number; cash_usd: number; sol_balance: number;
   holdings: Record<string, Holding>; note: string | null; trades: number; volume_usd: number; created_at: string;
   spark: number[]; last: { type: string; text: string; ts: string } | null;
+  sim?: boolean;
 }
-interface FeedItem { id: string; ts: string; type: string; text: string; sig: string | null; agent_id: number; name: string; color: number }
-interface State { now: string; markets: Market[]; agents: Agent[]; feed: FeedItem[]; stats: { live: number; active: number; aum: number; pnl: number; trades: number; volume: number; assets: number } }
+interface FeedItem { id: string; ts: string; type: string; text: string; sig: string | null; agent_id: number; name: string; color: number; sim?: boolean }
+interface State { now: string; markets: Market[]; agents: Agent[]; feed: FeedItem[]; stats: { live: number; active: number; sims?: number; aum: number; pnl: number; trades: number; volume: number; assets: number } }
 interface Me { wallet: string | null; restricted: { country: string; message: string } | null; limits: { gasSol: number; minDepositUsd: number; maxDepositUsd: number; maxAgents: number } }
 
 const SPY = "XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W";
@@ -51,7 +52,7 @@ export default function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [chartMint, setChartMint] = useState(SPY);
   const [openId, setOpenId] = useState<number | null>(null);
-  const [filter, setFilter] = useState<"ALL" | "MINE" | StratKey>("ALL");
+  const [filter, setFilter] = useState<"ALL" | "MINE" | "REAL" | "SIM" | StratKey>("ALL");
   const [toast, setToast] = useState<{ msg: string; err?: boolean } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -118,7 +119,7 @@ export default function App() {
           <div className="stats">
             <Stat k="Assets under agents" v={state ? usdShort(state.stats.aum) : "—"} />
             <Stat k="Net P&L" v={state ? (state.stats.pnl >= 0 ? "+" : "") + usd(state.stats.pnl, 0) : "—"} cls={state ? cls(state.stats.pnl) : ""} />
-            <Stat k="Agents live" v={state ? `${state.stats.live}/${state.stats.active}` : "—"} />
+            <Stat k={state?.stats.sims ? `Agents live · +${state.stats.sims} sim` : "Agents live"} v={state ? `${state.stats.live}/${state.stats.active}` : "—"} />
             <Stat k="Trades" v={state ? state.stats.trades.toLocaleString() : "—"} />
             <Stat k="Volume routed" v={state ? usdShort(state.stats.volume) : "—"} />
             <Stat k="Assets tracked" v={state ? String(state.stats.assets) : "—"} style={{ color: "var(--fire)" }} />
@@ -213,13 +214,14 @@ function ChartPanel({ markets, agents, mint, setMint }: { markets: Market[]; age
 /* ---------------- floor ---------------- */
 
 function Floor({ agents, mine, filter, setFilter, onOpen, loaded }: { agents: Agent[]; mine: string | null; filter: string; setFilter: (f: any) => void; onOpen: (id: number) => void; loaded: boolean }) {
-  const shown = agents.filter((a) => filter === "ALL" || (filter === "MINE" ? a.owner === mine : a.strat === filter));
-  const opts: [string, string][] = [["ALL", "All"], ...(mine ? [["MINE", "Mine"] as [string, string]] : []), ...STRAT_KEYS.map((k) => [k, STRATS[k].label.split(" ")[0]] as [string, string])];
+  const shown = agents.filter((a) => filter === "ALL" || (filter === "MINE" ? a.owner === mine : filter === "REAL" ? !a.sim : filter === "SIM" ? !!a.sim : a.strat === filter));
+  const hasSims = agents.some((a) => a.sim);
+  const opts: [string, string][] = [["ALL", "All"], ...(mine ? [["MINE", "Mine"] as [string, string]] : []), ...(hasSims ? [["REAL", "Real"], ["SIM", "Sim"]] as [string, string][] : []), ...STRAT_KEYS.map((k) => [k, STRATS[k].label.split(" ")[0]] as [string, string])];
   return (
     <section id="floor">
       <div className="floor-head">
         <h2>The floor</h2>
-        <span className="muted">Every agent's vault is public on-chain. Click one to open its desk.</span>
+        <span className="muted">Real agents trade from public on-chain vaults. Agents tagged SIM paper-trade the same strategies on live prices with no real funds. Click any agent to open its desk.</span>
         <div className="filters">{opts.map(([k, l]) => <button key={k} type="button" className="chip" aria-pressed={k === filter} onClick={() => setFilter(k)}>{l}</button>)}</div>
       </div>
       <div className="agents">
@@ -237,9 +239,9 @@ function AgentCard({ a, mine, onOpen }: { a: Agent; mine: boolean; onOpen: () =>
   const hs = Object.entries(a.holdings ?? {}).filter(([, h]) => h.value > 0.5).sort((x, y) => y[1].value - x[1].value).slice(0, 4);
   const thought = a.status === "awaiting_deposit" ? "waiting for a USDC + SOL deposit" : a.status === "provisioning" ? "creating vault…" : a.note || a.last?.text || "warming up";
   return (
-    <button type="button" className={"agent" + (a.status === "paused" ? " paused" : "") + (mine ? " mine" : "")} style={{ ["--agent" as any]: color }} onClick={onOpen}>
-      <div className="row"><span className="nm">{a.name}</span><span className={"pill " + pc}>{label}</span>{mine && <span className="mine-tag">YOURS</span>}</div>
-      <div className="strat">{STRATS[a.strat]?.label} · risk {a.risk}{a.address ? ` · ${short(a.address)}` : ""}</div>
+    <button type="button" className={"agent" + (a.status === "paused" ? " paused" : "") + (mine ? " mine" : "") + (a.sim ? " is-sim" : "")} style={{ ["--agent" as any]: color }} onClick={onOpen}>
+      <div className="row"><span className="nm">{a.name}</span>{a.sim ? <span className="pill sim">sim</span> : <span className={"pill " + pc}>{label}</span>}{mine && <span className="mine-tag">YOURS</span>}</div>
+      <div className="strat">{STRATS[a.strat]?.label} · risk {a.risk}{a.sim ? " · paper trading" : a.address ? ` · ${short(a.address)}` : ""}</div>
       <div className="body">
         <Sprite strat={a.strat} mood={moodOf(a)} />
         <div style={{ minWidth: 0 }}>
@@ -356,7 +358,7 @@ function Feed({ feed, onOpen }: { feed: FeedItem[]; onOpen: (id: number) => void
         {feed.map((e) => (
           <div key={e.id}>
             <span className="t">{hhmm(e.ts)}</span>
-            <button type="button" className="who" style={{ color: COLORS[e.color % COLORS.length], background: "none", border: 0, padding: 0, textAlign: "left", font: "inherit" }} onClick={() => onOpen(e.agent_id)}>{e.name}</button>
+            <button type="button" className="who" style={{ color: COLORS[e.color % COLORS.length], background: "none", border: 0, padding: 0, textAlign: "left", font: "inherit" }} onClick={() => onOpen(e.agent_id)}>{e.name}{e.sim ? " ·sim" : ""}</button>
             <span className={kind[e.type] || ""}>{e.text}{e.sig && <> · <a className="sig" href={txUrl(e.sig)} target="_blank" rel="noreferrer">tx</a></>}</span>
           </div>
         ))}
@@ -404,7 +406,7 @@ function Markets({ markets, agents, mint, setMint }: { markets: Market[]; agents
 
 /* ---------------- desk ---------------- */
 
-interface Detail { agent: Agent & { cadence_mul: number; uni: AssetKind[]; error: string | null }; events: { id: string; ts: string; type: string; text: string; sig: string | null }[]; equity: number[]; deposits: { sig: string; usdc: number; sol: number; ts: string }[] }
+interface Detail { agent: Agent & { cadence_mul: number; uni: AssetKind[]; error: string | null; sim?: boolean }; events: { id: string; ts: string; type: string; text: string; sig: string | null }[]; equity: number[]; deposits: { sig: string; usdc: number; sol: number; ts: string }[] }
 
 function Desk({ id, me, notify, onClose, onChanged }: { id: number; me: Me | null; notify: (m: string, e?: boolean) => void; onClose: () => void; onChanged: () => void }) {
   const [d, setD] = useState<Detail | null>(null);
@@ -471,7 +473,7 @@ function Desk({ id, me, notify, onClose, onChanged }: { id: number; me: Me | nul
               <h3 id="mName" style={{ color }}>{a.name} <span className={"pill " + pc} style={{ fontSize: 12, verticalAlign: "middle" }}>{label}</span></h3>
               <div className="muted">
                 {STRATS[a.strat]?.label} · {STRATS[a.strat]?.desc} Universe: {a.uni.map((k) => KIND_LABEL[k]).join(", ")}.
-                {a.address && <> Vault <a className="sig" href={acctUrl(a.address)} target="_blank" rel="noreferrer">{short(a.address)}</a>.</>} Owner {short(a.owner)}.
+                {a.address && <> Vault <a className="sig" href={acctUrl(a.address)} target="_blank" rel="noreferrer">{short(a.address)}</a>.</>} {a.sim ? "Paper trading." : <>Owner {short(a.owner)}.</>}
               </div>
             </div>
             <button className="m-close" ref={closeRef} type="button" onClick={onClose}>Close [esc]</button>
@@ -484,6 +486,7 @@ function Desk({ id, me, notify, onClose, onChanged }: { id: number; me: Me | nul
             <Stat k="Trades · volume" v={`${a.trades} · ${usdShort(a.volume_usd)}`} />
           </div>
 
+          {a.sim && <div className="banner" style={{ marginTop: 16 }}>Simulated agent. It runs the {STRATS[a.strat]?.label} strategy on live market prices with paper USDC: no vault, no real funds, no on-chain trades. Fills include estimated fees and slippage. Spawn your own agent to trade for real.</div>}
           {a.status === "provisioning" && <p className="note-sm" style={{ marginTop: 16 }}>Creating this agent's vault in Turnkey. This takes a few seconds.{a.error ? ` Last error: ${a.error}` : ""}</p>}
 
           {isOwner && a.address && ["awaiting_deposit", "live", "paused"].includes(a.status) && (

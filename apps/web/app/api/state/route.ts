@@ -29,20 +29,21 @@ async function getState() {
     sql<Tick[]>`SELECT mint, price FROM price_ticks WHERE ts > now() - interval '61 minutes' ORDER BY ts ASC`,
     sql<any[]>`
       SELECT id, owner, name, strat, risk, color, status, address, deposited_usd, withdrawn_usd, equity_usd, cash_usd, sol_balance,
-             holdings, note, trades, volume_usd, created_at, last_rebalance_at
-      FROM agents WHERE status <> 'retired' ORDER BY (status = 'live') DESC, equity_usd DESC, id DESC LIMIT 60`,
+             holdings, note, trades, volume_usd, created_at, last_rebalance_at, sim
+      FROM agents WHERE status <> 'retired' ORDER BY sim ASC, (status = 'live') DESC, equity_usd DESC, id DESC LIMIT 60`,
     sql<any[]>`
-      SELECT e.id, e.ts, e.type, e.text, e.sig, a.id AS agent_id, a.name, a.color
+      SELECT e.id, e.ts, e.type, e.text, e.sig, a.id AS agent_id, a.name, a.color, a.sim
       FROM agent_events e JOIN agents a ON a.id = e.agent_id
       WHERE e.type <> 'think' ORDER BY e.ts DESC LIMIT 60`,
     sql<any[]>`
       SELECT
-        count(*) FILTER (WHERE status = 'live')::int AS live,
-        count(*) FILTER (WHERE status <> 'retired')::int AS active,
-        coalesce(sum(equity_usd) FILTER (WHERE status <> 'retired'), 0)::float8 AS aum,
-        coalesce(sum(deposited_usd - withdrawn_usd) FILTER (WHERE status <> 'retired'), 0)::float8 AS net_deposits,
-        coalesce(sum(trades), 0)::int AS trades,
-        coalesce(sum(volume_usd), 0)::float8 AS volume
+        count(*) FILTER (WHERE status = 'live' AND NOT sim)::int AS live,
+        count(*) FILTER (WHERE status <> 'retired' AND NOT sim)::int AS active,
+        count(*) FILTER (WHERE status <> 'retired' AND sim)::int AS sims,
+        coalesce(sum(equity_usd) FILTER (WHERE status <> 'retired' AND NOT sim), 0)::float8 AS aum,
+        coalesce(sum(deposited_usd - withdrawn_usd) FILTER (WHERE status <> 'retired' AND NOT sim), 0)::float8 AS net_deposits,
+        coalesce(sum(trades) FILTER (WHERE NOT sim), 0)::int AS trades,
+        coalesce(sum(volume_usd) FILTER (WHERE NOT sim), 0)::float8 AS volume
       FROM agents`,
   ]);
 
@@ -89,7 +90,7 @@ async function getState() {
       markets,
       agents: out,
       feed,
-      stats: { live: t.live, active: t.active, aum: t.aum, pnl: t.aum - t.net_deposits, trades: t.trades, volume: t.volume, assets: markets.length },
+      stats: { live: t.live, active: t.active, sims: t.sims, aum: t.aum, pnl: t.aum - t.net_deposits, trades: t.trades, volume: t.volume, assets: markets.length },
     },
     200,
     { "cache-control": "public, s-maxage=5, stale-while-revalidate=10" },

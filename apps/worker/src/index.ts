@@ -4,6 +4,7 @@ import { migrate } from "./migrate";
 import { market } from "./market";
 import { discoverPairs } from "./discovery";
 import { checkFunding, loadAgents, provision, refreshOnly, runLive, withdraw, type AgentRow } from "./agents";
+import { ensureSimAgents, runPaper } from "./paper";
 
 const busy = new Set<number>();
 // Exponential backoff per agent after an error, so a stuck agent doesn't spam retries.
@@ -34,11 +35,12 @@ async function minuteLoop() {
   const minute = Math.floor(Date.now() / 60000);
   try {
     const agents = await loadAgents(["live", "paused"]);
-    const held = agents.flatMap((a) => Object.keys(a.holdings ?? {}));
+    const held = agents.filter((a) => !a.sim).flatMap((a) => Object.keys(a.holdings ?? {}));
     const n = await market.tick(held);
     console.log(`[tick] ${new Date().toISOString()} priced ${n} assets, ${agents.length} agents`);
     for (const ag of agents) {
-      if (ag.status === "live") await guarded(ag, () => runLive(ag, minute), "trade");
+      if (ag.sim) await guarded(ag, () => runPaper(ag, minute), "paper");
+      else if (ag.status === "live") await guarded(ag, () => runLive(ag, minute), "trade");
       else await guarded(ag, () => refreshOnly(ag, minute), "refresh");
     }
     if (minute % 60 === 0) {
@@ -82,6 +84,7 @@ async function discoveryLoop() {
 async function main() {
   console.log(`stock-quant worker starting. trading=${env.tradingEnabled} withdrawals=${env.withdrawalsEnabled} jupiter=${env.jupiter.baseUrl}`);
   await migrate();
+  await ensureSimAgents();
   await market.loadAssets();
   await market.loadHistory();
   await discoveryLoop();

@@ -161,6 +161,7 @@ export default function Docs() {
             <details><summary>Can I add more USDC later?</summary><p>Yes. Open the desk and use <em>Top up</em>. Deposits made through the app count toward your P&amp;L baseline. Funds sent to the vault from elsewhere still work, but aren't counted as a deposit.</p></details>
             <details><summary>What happens if a trade fails?</summary><p>It's logged in red on the desk and retried on the next rebalance. Nothing is lost; the USDC simply stays in the vault.</p></details>
             <details><summary>Does a tokenized stock make me a shareholder?</summary><p>No. Tokenized stocks and stock-paired coins track prices but carry no voting, dividend or ownership rights in the company.</p></details>
+            <details><summary>What are the SIM agents on the floor?</summary><p>They're simulated agents, one per strategy, that paper-trade on the same live prices with $1,000 of pretend USDC. They show how each strategy behaves. They hold no funds, never trade on-chain, and are left out of the platform totals (assets, P&amp;L, trades, volume). They're always tagged SIM with a dashed border.</p></details>
             <details><summary>Who can see my agent?</summary><p>Everyone. The floor shows every agent, its strategy and P&amp;L, and the vault address is public on Solana. Only you can control it or withdraw from it.</p></details>
           </section>
 

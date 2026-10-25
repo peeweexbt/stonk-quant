@@ -242,7 +242,7 @@ tbody tr.sel { background: rgba(184,236,253,.09); }
 .note-sm { font-size: 11px; color: var(--muted); line-height: 1.5; margin: 0; }
 .agent.mine { border-color: var(--line-hi); }
 .agent .mine-tag { font-size: 10px; color: var(--amber); letter-spacing: .1em; }
-.pill.wait { color: var(--fire); } .pill.err { color: var(--down); } .pill.out { color: var(--muted); }
+.pill.wait { color: var(--fire); } .pill.sim { color: var(--violet); border-style: dashed; } .agent.is-sim { border-style: dashed; } .pill.err { color: var(--down); } .pill.out { color: var(--muted); }
 a.sig { color: var(--cyan); text-decoration: none; } a.sig:hover { text-decoration: underline; }
 .terms { display: flex; gap: 8px; align-items: flex-start; font-size: 11px; color: var(--muted); line-height: 1.5; }
 .terms input { margin-top: 2px; accent-color: var(--amber); }

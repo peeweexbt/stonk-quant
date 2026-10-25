@@ -16,7 +16,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const sql = db();
   const [agent] = await sql<any[]>`
     SELECT id, owner, name, strat, risk, cadence_mul, uni, color, status, address, deposited_usd, withdrawn_usd, equity_usd, cash_usd,
-           sol_balance, holdings, note, trades, volume_usd, error, created_at, last_rebalance_at
+           sol_balance, holdings, note, trades, volume_usd, error, created_at, last_rebalance_at, sim
     FROM agents WHERE id = ${id}`;
   if (!agent) return fail("agent not found", 404);
   const [events, equity, deposits] = await Promise.all([

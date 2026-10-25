@@ -34,6 +34,7 @@ export interface AgentRow {
   trades: number;
   volume_usd: number;
   last_rebalance_at: Date | null;
+  sim: boolean;
 }
 
 export interface Holding {

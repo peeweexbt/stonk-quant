@@ -43,4 +43,9 @@ export const env = {
     maxOtc: Number(opt("DISCOVERY_MAX_OTC", "16")),
   },
   otcBase: opt("OTC_BASE_URL", "https://otcdesks.cash"),
+  // simulated paper-trading agents shown on the floor (0 = none; existing ones get retired)
+  sim: {
+    count: Number(opt("SIM_AGENTS", "6")),
+    deposit: Number(opt("SIM_DEPOSIT_USD", "1000")),
+  },
 };

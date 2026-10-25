@@ -17,9 +17,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (typeof signature !== "string" || signature.length < 60) return fail("missing transaction signature");
 
   const sql = db();
-  const [agent] = await sql<{ owner: string; address: string | null; status: string; deposited_usd: number }[]>`
-    SELECT owner, address, status, deposited_usd FROM agents WHERE id = ${id}`;
+  const [agent] = await sql<{ owner: string; address: string | null; status: string; deposited_usd: number; sim: boolean }[]>`
+    SELECT owner, address, status, deposited_usd, sim FROM agents WHERE id = ${id}`;
   if (!agent) return fail("agent not found", 404);
+  if (agent.sim) return fail("simulated agents can't take deposits", 400);
   if (agent.owner !== wallet) return fail("that agent isn't yours", 403);
   if (!agent.address) return fail("vault isn't ready yet");
   if (["withdrawing", "retired"].includes(agent.status)) return fail("this agent is retiring and can't take deposits");
