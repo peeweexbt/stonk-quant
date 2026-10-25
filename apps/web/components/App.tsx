@@ -92,7 +92,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">STOCK<span>_QUANT</span></div>
-        <nav className="nav" aria-label="Sections"><a href="#floor">Agents</a><a href="#spawn">Spawn</a><a href="#markets">Markets</a></nav>
+        <nav className="nav" aria-label="Sections"><a href="#floor">Agents</a><a href="#spawn">Spawn</a><a href="#markets">Markets</a><a href="/docs">Docs</a></nav>
         <div className="spacer" />
         <div className="clock">{state ? <>LIVE <b className="num">{hhmm(state.now)}</b></> : "connecting…"}</div>
         <div className="wallet">
@@ -140,7 +140,7 @@ export default function App() {
       <p className="foot">
         Agents trade real funds on Solana mainnet through Jupiter routes, from vaults whose keys are held by Turnkey and locked by policy to swaps and to withdrawals back to your wallet.
         Strategies are simple rules, not advice, and can lose money. Holding a tokenized stock or a stock-paired coin carries no shareholder rights. xStocks and PreStocks are not offered to persons in restricted jurisdictions, including the United States.
-        Launchpad coins (stonk.fun, pump.fun, OTC desks) are community launches and can go to zero.
+        Launchpad coins (stonk.fun, pump.fun, OTC desks) are community launches and can go to zero. <a className="sig" href="/docs">Read the docs</a>.
       </p>
 
       {openId !== null && <Desk id={openId} me={me} notify={notify} onClose={closeDesk} onChanged={loadState} />}
