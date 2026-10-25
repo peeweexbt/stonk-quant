@@ -25,7 +25,7 @@ async function getState() {
   const [assets, ticks, agents, feed, totals] = await Promise.all([
     sql<{ mint: string; sym: string; name: string; kind: string; quote_sym: string | null; logo: string | null; mcap_usd: number | null }[]>`
       SELECT mint, sym, name, kind, quote_sym, logo, mcap_usd FROM assets WHERE active ORDER BY
-        CASE kind WHEN 'xstock' THEN 0 WHEN 'prestock' THEN 1 WHEN 'stonk' THEN 2 ELSE 3 END, mcap_usd DESC NULLS LAST, sym`,
+        CASE kind WHEN 'xstock' THEN 0 WHEN 'prestock' THEN 1 WHEN 'stonk' THEN 2 WHEN 'pair' THEN 3 WHEN 'pump' THEN 4 ELSE 5 END, mcap_usd DESC NULLS LAST, sym`,
     sql<Tick[]>`SELECT mint, price FROM price_ticks WHERE ts > now() - interval '61 minutes' ORDER BY ts ASC`,
     sql<any[]>`
       SELECT id, owner, name, strat, risk, color, status, address, deposited_usd, withdrawn_usd, equity_usd, cash_usd, sol_balance,

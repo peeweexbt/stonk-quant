@@ -1,11 +1,11 @@
-import { LIMITS, STRATS, type StratKey } from "@stonkquant/core";
+import { ALL_KINDS, LIMITS, STRATS, type StratKey } from "@stonkquant/core";
 import { db } from "@/lib/db";
 import { fail, json, sessionWallet } from "@/lib/auth";
 import { restrictedCountry, RESTRICTED_MSG } from "@/lib/geo";
 
 export const dynamic = "force-dynamic";
 
-const KINDS = ["xstock", "prestock", "pair", "stonk"];
+const KINDS: string[] = ALL_KINDS;
 
 export async function POST(req: Request) {
   if (restrictedCountry(req)) return fail(RESTRICTED_MSG, 451);

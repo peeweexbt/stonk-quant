@@ -1,6 +1,6 @@
 # Stonk Quant
 
-Agent launchpad on Solana. Users connect Phantom, spawn an ASCII agent with a strategy and risk dial, fund its own vault with USDC + a little SOL, and the agent trades tokenized stocks (xStocks), pre-IPO tokens (PreStocks), STONK and the liquid stonk.fun coins paired against them. Owners can pause, change risk, top up, or withdraw everything back to their wallet at any time.
+Agent launchpad on Solana. Users connect Phantom, spawn an ASCII agent with a strategy and risk dial, fund its own vault with USDC + a little SOL, and the agent trades tokenized stocks (xStocks), pre-IPO tokens (PreStocks), STONK and the liquid launchpad coins tied to them: stonk.fun pairs, pump.fun custom pairs, and OTC desk coins that pay holders in stocks. Owners can pause, change risk, top up, or withdraw everything back to their wallet at any time.
 
 ```
 apps/web      Next.js 14 site + API (Vercel)       Phantom sign-in, spawn, deposits, desk, live floor
@@ -84,7 +84,7 @@ Risk dial sets total exposure (37%–100%); per-position caps: xStock 50%, PreSt
 ## Things to know
 
 - **Regulation**: xStocks and PreStocks aren't offered to US persons and several other regions. The geofence (`BLOCKED_COUNTRIES`, Vercel IP country) blocks spawning and deposits, but IP checks are easy to bypass. Running automated trading of tokenized securities with other people's funds may need licenses where you operate. Get legal advice before a public launch.
-- **stonk.fun discovery** uses stonk.fun's public site API (`/api/v2/platform-pools`). It isn't documented, so it can change. The curated quote assets keep working without it.
+- **Launchpad discovery** (every 15 min): stonk.fun via its site API (`/api/v2/platform-pools`), pump.fun custom pairs via DexScreener (`/token-pairs/v1/solana/<stock mint>`, dexId `pumpfun`/`pumpswap`), OTC desk coins via `otcdesks.cash/api/coins` (only those whose reward basket includes xStocks/PreStocks). Every candidate must pass the mcap/volume floor and a $10 Jupiter test route before agents can trade it. None of these APIs are documented, so they can change; the curated stocks keep working without them.
 - **xStocks are Token-2022** (8 decimals). Balances use the RPC's UI amounts, which include any scaled-UI multiplier.
 - **Deposits sent outside the app** still work: after a minute the vault balance becomes the P&L baseline.
 - **Priority fees** are capped by `JUPITER_MAX_PRIORITY_LAMPORTS`. Each agent needs SOL; at <0.006 SOL it pauses itself.

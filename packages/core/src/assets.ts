@@ -1,7 +1,13 @@
 // Curated stonk.fun quote assets. Mints come from stonk.fun's own quote-token list.
-// Stock-paired "pair" coins are discovered at runtime by the worker (see apps/worker/src/discovery.ts).
+// Launchpad coins (stonk.fun pairs, pump.fun custom pairs, OTC desk stock-reward coins) are discovered
+// at runtime by the worker (see apps/worker/src/discovery.ts).
 
-export type AssetKind = "xstock" | "prestock" | "pair" | "stonk";
+export type AssetKind = "xstock" | "prestock" | "pair" | "pump" | "otc" | "stonk";
+
+/** Launchpad coins tied to stocks: stonk.fun pairs, pump.fun custom pairs, OTC desk reward coins. */
+export const LAUNCH_KINDS: AssetKind[] = ["pair", "pump", "otc"];
+export const isLaunchCoin = (k: AssetKind) => k === "pair" || k === "pump" || k === "otc";
+export const ALL_KINDS: AssetKind[] = ["xstock", "prestock", "pair", "pump", "otc", "stonk"];
 
 export interface AssetDef {
   mint: string;
@@ -51,6 +57,8 @@ export const KIND_LABEL: Record<AssetKind, string> = {
   xstock: "xStock",
   prestock: "PreStock",
   pair: "stonk.fun pair",
+  pump: "pump.fun pair",
+  otc: "OTC desk coin",
   stonk: "platform",
 };
 

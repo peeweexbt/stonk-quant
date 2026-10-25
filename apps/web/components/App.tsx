@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { KIND_LABEL, STRATS, STRAT_KEYS, type AssetKind, type StratKey } from "@stonkquant/core";
+import { ALL_KINDS, KIND_LABEL, STRATS, STRAT_KEYS, isLaunchCoin, type AssetKind, type StratKey } from "@stonkquant/core";
 import { Sprite, spriteText, type Mood } from "./Sprite";
 import { asciiCandles, asciiSpark, figlet, sparkSvg } from "./chart";
 import { COLORS, acctUrl, cls, hhmm, pct, price, qty, short, txUrl, usd, usdShort } from "./format";
@@ -21,6 +21,7 @@ interface State { now: string; markets: Market[]; agents: Agent[]; feed: FeedIte
 interface Me { wallet: string | null; restricted: { country: string; message: string } | null; limits: { gasSol: number; minDepositUsd: number; maxDepositUsd: number; maxAgents: number } }
 
 const SPY = "XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W";
+const UNI_LABEL: Record<AssetKind, string> = { xstock: "xStocks", prestock: "PreStocks", pair: "stonk.fun pairs", pump: "pump.fun pairs", otc: "OTC desk coins", stonk: "STONK" };
 const STATUS_PILL: Record<string, [string, string]> = {
   provisioning: ["boot", "creating vault"], awaiting_deposit: ["wait", "needs deposit"], live: ["live", "live"],
   paused: ["paused", "paused"], withdrawing: ["wait", "withdrawing"], retired: ["out", "retired"],
@@ -113,7 +114,7 @@ export default function App() {
       <section className="hero">
         <div className="hero-left">
           <pre className="logo" aria-label="Stonk Quant">{figlet("STONK")}{"\n"}<span className="q">{figlet("QUANT")}</span></pre>
-          <p className="pitch">Spawn an agent, fund its vault, and it trades <em>tokenized stocks</em> and <em>stock-paired coins</em> across the stonk.fun ecosystem on Solana for you. Every agent has its own strategy, wallet and risk dial, and you can withdraw any time.</p>
+          <p className="pitch">Spawn an agent, fund its vault, and it trades <em>tokenized stocks</em> and <em>stock-paired coins</em> from stonk.fun, pump.fun and OTC desks on Solana for you. Every agent has its own strategy, wallet and risk dial, and you can withdraw any time.</p>
           <div className="stats">
             <Stat k="Assets under agents" v={state ? usdShort(state.stats.aum) : "—"} />
             <Stat k="Net P&L" v={state ? (state.stats.pnl >= 0 ? "+" : "") + usd(state.stats.pnl, 0) : "—"} cls={state ? cls(state.stats.pnl) : ""} />
@@ -139,7 +140,7 @@ export default function App() {
       <p className="foot">
         Agents trade real funds on Solana mainnet through Jupiter routes, from vaults whose keys are held by Turnkey and locked by policy to swaps and to withdrawals back to your wallet.
         Strategies are simple rules, not advice, and can lose money. Holding a tokenized stock or a stock-paired coin carries no shareholder rights. xStocks and PreStocks are not offered to persons in restricted jurisdictions, including the United States.
-        Pair coins are community launches on stonk.fun and can go to zero.
+        Launchpad coins (stonk.fun, pump.fun, OTC desks) are community launches and can go to zero.
       </p>
 
       {openId !== null && <Desk id={openId} me={me} notify={notify} onClose={closeDesk} onChanged={loadState} />}
@@ -179,7 +180,7 @@ function ChartPanel({ markets, agents, mint, setMint }: { markets: Market[]; age
   const m = markets.find((x) => x.mint === mint);
   const tabs = useMemo(() => {
     const pick = ["SPYx", "NVDAx", "OPENAI", "STONK"].map((s) => markets.find((x) => x.sym === s)).filter(Boolean) as Market[];
-    const topPair = markets.find((x) => x.kind === "pair");
+    const topPair = markets.find((x) => isLaunchCoin(x.kind));
     const list = topPair ? [...pick, topPair] : pick;
     if (m && !list.some((x) => x.mint === m.mint)) list.push(m);
     return list;
@@ -310,8 +311,8 @@ function Spawn({ me, onSignIn, notify, onCreated }: { me: Me | null; onSignIn: (
         <div className="field">
           <span className="lbl">Allowed universe</span>
           <div className="checks">
-            {(["xstock", "prestock", "pair", "stonk"] as AssetKind[]).map((k) => (
-              <label key={k}><input type="checkbox" id={"u-" + k} checked={uni.includes(k)} onChange={() => toggle(k)} /> {k === "xstock" ? "xStocks" : k === "prestock" ? "PreStocks" : k === "pair" ? "stonk.fun pairs" : "STONK"}</label>
+            {ALL_KINDS.map((k) => (
+              <label key={k}><input type="checkbox" id={"u-" + k} checked={uni.includes(k)} onChange={() => toggle(k)} /> {UNI_LABEL[k]}</label>
             ))}
           </div>
         </div>
@@ -373,8 +374,8 @@ function Markets({ markets, agents, mint, setMint }: { markets: Market[]; agents
       <span className="tag">Markets</span>
       <span className="tag-r">click a row to chart it</span>
       <div className="sec-head">
-        <h2 className="sec-title">stonk.fun universe</h2>
-        <span className="muted">Quote assets plus the most liquid coins launched against them on stonk.fun.</span>
+        <h2 className="sec-title">Stock universe</h2>
+        <span className="muted">Tokenized stocks plus the most liquid launchpad coins tied to them: stonk.fun pairs, pump.fun custom pairs and OTC desk coins that pay holders in stocks.</span>
       </div>
       <div className="mkts-wrap">
         <table>
@@ -386,7 +387,7 @@ function Markets({ markets, agents, mint, setMint }: { markets: Market[]; agents
                 <tr key={a.mint} className={a.mint === mint ? "sel" : ""} onClick={() => { setMint(a.mint); document.querySelector(".chart-frame")?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>
                   <td className="sym-cell"><b>{a.sym}</b> <span className="muted">{a.name}</span></td>
                   <td><span className={"kind k-" + a.kind}>{KIND_LABEL[a.kind]}</span></td>
-                  <td>{a.quote_sym || "USD"}</td>
+                  <td>{a.kind === "otc" ? `pays ${a.quote_sym}` : a.quote_sym || "USD"}</td>
                   <td className="r">{price(a.price)}</td>
                   <td className={"r " + cls(a.ch1h)}>{pct(a.ch1h)}</td>
                   <td className={"spark " + cls(a.ch1h)}>{asciiSpark(a.spark)}</td>

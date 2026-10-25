@@ -1,4 +1,4 @@
-import { INDEX_WEIGHTS, STONK_MINT, type AssetKind } from "./assets";
+import { INDEX_WEIGHTS, STONK_MINT, isLaunchCoin, type AssetKind } from "./assets";
 
 export type StratKey = "MOMENTUM" | "MEANREV" | "INDEX" | "PREIPO" | "SNIPER" | "BURNER";
 
@@ -11,12 +11,12 @@ export interface StratDef {
 }
 
 export const STRATS: Record<StratKey, StratDef> = {
-  MOMENTUM: { label: "Momentum Monk", hat: ["   .-^-.   "], cad: 15, uni: ["xstock", "prestock", "pair", "stonk"], desc: "Rides the three strongest 60-minute trends." },
+  MOMENTUM: { label: "Momentum Monk", hat: ["   .-^-.   "], cad: 15, uni: ["xstock", "prestock", "pair", "pump", "otc", "stonk"], desc: "Rides the three strongest 60-minute trends." },
   MEANREV: { label: "Reversion Goblin", hat: ["   /\\ /\\   "], cad: 20, uni: ["xstock", "prestock", "stonk"], desc: "Buys stretched dips back toward the 2-hour mean." },
   INDEX: { label: "Index Hugger", hat: ["   ▄▄▄▄▄   "], cad: 240, uni: ["xstock"], desc: "Holds a cap-weighted xStock basket, rebalances lazily." },
-  PREIPO: { label: "Pre-IPO Prophet", hat: ["    /^\\    "], cad: 60, uni: ["prestock", "pair"], desc: "PreStocks plus the stonk.fun coins quoted in them." },
-  SNIPER: { label: "Pair Sniper", hat: ["  ==[+]==  "], cad: 5, uni: ["pair"], desc: "Hunts breakouts on stock-paired curves, quick exits." },
-  BURNER: { label: "Flywheel Farmer", hat: ["   ( ) )   ", "   ) ( (   "], cad: 120, uni: ["stonk", "pair"], desc: "Stacks STONK and the strongest reward-launch coins." },
+  PREIPO: { label: "Pre-IPO Prophet", hat: ["    /^\\    "], cad: 60, uni: ["prestock", "pair", "pump"], desc: "PreStocks plus the launchpad coins quoted in them." },
+  SNIPER: { label: "Pair Sniper", hat: ["  ==[+]==  "], cad: 5, uni: ["pair", "pump", "otc"], desc: "Hunts breakouts on stock-paired launchpad coins, quick exits." },
+  BURNER: { label: "Flywheel Farmer", hat: ["   ( ) )   ", "   ) ( (   "], cad: 120, uni: ["stonk", "pair", "otc"], desc: "Stacks STONK and the strongest reward-paying coins." },
 };
 
 export const STRAT_KEYS = Object.keys(STRATS) as StratKey[];
@@ -76,7 +76,7 @@ const pct = (x: number, dp = 1) => (x >= 0 ? "+" : "") + (x * 100).toFixed(dp) +
 export const MIN_HISTORY = 30;
 
 /** Per-position caps (fraction of equity) so no single coin dominates a vault. */
-export const POSITION_CAP: Record<AssetKind, number> = { xstock: 0.5, prestock: 0.4, stonk: 0.4, pair: 0.2 };
+export const POSITION_CAP: Record<AssetKind, number> = { xstock: 0.5, prestock: 0.4, stonk: 0.4, pair: 0.2, pump: 0.15, otc: 0.15 };
 
 export function computeTargets(ag: AgentView, market: MarketAsset[]): TargetResult {
   const r = rawTargets(ag, market);
@@ -126,13 +126,13 @@ function rawTargets(ag: AgentView, market: MarketAsset[]): TargetResult {
       const preMints = new Set(market.filter((a) => a.kind === "prestock").map((a) => a.mint));
       const raw: Record<string, number> = {};
       pre.forEach((a) => (raw[a.mint] = 1 + Math.max(-0.5, Math.min(0.5, ret(a, 240) * 10))));
-      U.filter((a) => a.kind === "pair" && a.quoteMint && preMints.has(a.quoteMint)).slice(0, 3).forEach((a) => (raw[a.mint] = 0.35));
+      U.filter((a) => isLaunchCoin(a.kind) && a.quoteMint && preMints.has(a.quoteMint)).slice(0, 3).forEach((a) => (raw[a.mint] = 0.35));
       norm(raw);
       const best = pre.slice().sort((a, b) => ret(b, 240) - ret(a, 240))[0];
       return { w, band: 0.04, note: best ? `strongest pre-IPO over 4h: ${best.sym} ${pct(ret(best, 240))}` : "needs PreStocks in its universe" };
     }
     case "SNIPER": {
-      const pairs = U.filter((a) => a.kind === "pair");
+      const pairs = U.filter((a) => isLaunchCoin(a.kind));
       const raw: Record<string, number> = {};
       let exit = "";
       pairs.forEach((a) => {
@@ -146,12 +146,12 @@ function rawTargets(ag: AgentView, market: MarketAsset[]): TargetResult {
       pairs.filter((a) => !raw[a.mint] && ret(a, 15) > 0.05 && ret(a, 3) > 0).sort((a, b) => ret(b, 15) - ret(a, 15)).slice(0, slots).forEach((a) => (raw[a.mint] = 1));
       norm(raw);
       const hottest = pairs.slice().sort((a, b) => ret(b, 15) - ret(a, 15))[0];
-      return { w, band: 0.05, note: exit || (hottest ? `scanning ${pairs.length} curves, hottest ${hottest.sym} ${pct(ret(hottest, 15))} 15m` : "needs stonk.fun pairs in its universe") };
+      return { w, band: 0.05, note: exit || (hottest ? `scanning ${pairs.length} curves, hottest ${hottest.sym} ${pct(ret(hottest, 15))} 15m` : "needs launchpad coins in its universe") };
     }
     case "BURNER": {
       const raw: Record<string, number> = {};
       if (U.some((a) => a.mint === STONK_MINT)) raw[STONK_MINT] = 0.5;
-      const top = U.filter((a) => a.kind === "pair").sort((a, b) => ret(b, 240) - ret(a, 240)).slice(0, 2);
+      const top = U.filter((a) => isLaunchCoin(a.kind)).sort((a, b) => ret(b, 240) - ret(a, 240)).slice(0, 2);
       top.forEach((a) => (raw[a.mint] = 0.25));
       norm(raw);
       return { w, band: 0.05, note: `stacking STONK${top.length ? `, farming ${top.map((a) => a.sym).join(", ")}` : ""}` };

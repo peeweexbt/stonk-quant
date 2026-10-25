@@ -71,7 +71,7 @@ async function discoveryLoop() {
   try {
     const n = await discoverPairs();
     await market.loadAssets();
-    console.log(`[discovery] ${n} stonk.fun pairs in universe`);
+    console.log(`[discovery] stonk.fun ${n.pair ?? "-"} · pump.fun ${n.pump ?? "-"} · OTC ${n.otc ?? "-"} coins in universe`);
   } catch (e) { console.error("[discovery]", e); }
 }
 

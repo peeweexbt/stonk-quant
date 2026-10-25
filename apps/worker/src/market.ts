@@ -47,7 +47,7 @@ class Market {
     const mints = new Set<string>([...[...this.assets.values()].filter((a) => a.active).map((a) => a.mint), ...extraMints.filter((m) => this.assets.has(m))]);
     const list = [...mints];
     const prices = await getPrices(list);
-    const missing = list.filter((m) => !prices[m]).map((m) => this.assets.get(m)).filter((a): a is AssetRow => !!a && !!a.pool);
+    const missing = list.filter((m) => !prices[m]).map((m) => this.assets.get(m)).filter((a): a is AssetRow => !!a && !!a.pool && a.kind === "pair");
     Object.assign(prices, await stonkfunPrices(missing.map((a) => ({ mint: a.mint, pool: a.pool! }))));
     const ts = new Date(Math.floor(Date.now() / 60000) * 60000);
     const rows: { mint: string; ts: Date; price: number }[] = [];

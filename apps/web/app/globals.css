@@ -191,7 +191,7 @@ tbody tr:hover { background: rgba(184,236,253,.05); }
 tbody tr.sel { background: rgba(184,236,253,.09); }
 .sym-cell b { color: var(--amber); font-weight: 500; }
 .kind { font-size: 10px; padding: 0 5px; border: 1px solid; text-transform: uppercase; letter-spacing: .08em; }
-.k-xstock { color: var(--cyan); } .k-prestock { color: var(--violet); } .k-pair { color: var(--pink); } .k-stonk { color: var(--fire); }
+.k-xstock { color: var(--cyan); } .k-prestock { color: var(--violet); } .k-pair { color: var(--pink); } .k-pump { color: var(--lime); } .k-otc { color: var(--amber); } .k-stonk { color: var(--fire); }
 .spark { letter-spacing: -1px; }
 .sec-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 
