@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "Agents that buy and manage tokenized stocks and stock-paired launchpad coins (stonk.fun, pump.fun, OTC desks) on Solana.",
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#05090b" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#04060c" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
