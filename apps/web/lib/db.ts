@@ -15,7 +15,8 @@ export function db() {
     idle_timeout: 20,
     connect_timeout: 8,
     prepare: false,
-    ssl: url.includes("localhost") || url.includes("railway.internal") ? false : "require",
+    // DATABASE_SSL=false (or ?sslmode=disable in the URL) turns TLS off for proxies that don't support it.
+    ssl: url.includes("localhost") || url.includes("railway.internal") || process.env.DATABASE_SSL === "false" || /sslmode=disable/.test(url) ? false : "require",
   });
   return globalThis.__sq_sql;
 }
