@@ -49,7 +49,7 @@ export default function Docs() {
         <main className="docs-body">
           <section id="overview">
             <h1>How Stock Quant works</h1>
-            <p className="lede">Stock Quant is a launchpad for trading agents. You spawn an agent, give it a strategy and a risk level, and fund its own Solana vault with USDC. The agent then trades tokenized stocks and the launchpad coins tied to them on your behalf, around the clock. You can pause it, change its risk, top it up or withdraw everything back to your wallet at any time.</p>
+            <p className="lede">Stock Quant runs trading agents for you. You spawn an agent, give it a strategy and a risk level, and fund its own Solana vault with USDC. The agent then trades tokenized stocks and the stock-paired coins tied to them on your behalf, around the clock. You can pause it, change its risk, top it up or withdraw everything back to your wallet at any time.</p>
             <div className="docs-flow">
               {["Connect Phantom", "Spawn an agent", "Fund its vault", "It trades", "Withdraw anytime"].map((s, i) => (
                 <div key={s} className="docs-step"><span className="num">{String(i + 1).padStart(2, "0")}</span>{s}</div>
@@ -113,7 +113,7 @@ export default function Docs() {
               <li><b>Position caps:</b> no single asset can exceed {(["xstock", "prestock", "stonk", "pair", "pump", "otc"] as AssetKind[]).map((k) => `${Math.round(POSITION_CAP[k] * 100)}% (${KIND_LABEL[k]})`).join(", ")} of the vault.</li>
               <li><b>Rebalance speed:</b> <em>Fast</em> checks twice as often as normal, <em>Patient</em> 2.5× less often (fewer trades, lower fees).</li>
               <li><b>Drift bands:</b> agents only trade when a position is meaningfully off target, so they don't churn on tiny moves. Trades under ${LIMITS.minTradeUsd} are skipped.</li>
-              <li><b>Stop-losses:</b> checked every minute. A position is closed if it falls {(["xstock", "prestock", "stonk", "pair"] as AssetKind[]).map((k) => `${Math.round(RISK_RULES[k].stop * 100)}% (${k === "pair" ? "launchpad coins" : KIND_LABEL[k]})`).join(", ")} below its entry, then the asset is benched for 6 hours.</li>
+              <li><b>Stop-losses:</b> checked every minute. A position is closed if it falls {(["xstock", "prestock", "stonk", "pair"] as AssetKind[]).map((k) => `${Math.round(RISK_RULES[k].stop * 100)}% (${k === "pair" ? "stock-paired coins" : KIND_LABEL[k]})`).join(", ")} below its entry, then the asset is benched for 6 hours.</li>
               <li><b>Trailing take-profit:</b> once a position is up by its arm level (e.g. {Math.round(RISK_RULES.xstock.arm * 100)}% on xStocks), it's sold if it gives back {Math.round(RISK_RULES.xstock.trail * 100)}% from its high.</li>
               <li><b>Minimum hold:</b> Momentum holds new positions at least {MIN_HOLD_MIN.MOMENTUM / 60}h and Reversion {MIN_HOLD_MIN.MEANREV / 60}h (risk exits excepted), so a flickering signal doesn't burn fees.</li>
               <li><b>Risk-off:</b> when SPYx is falling over 4 hours, agents halve their exposure to everything except xStocks.</li>
@@ -136,7 +136,7 @@ export default function Docs() {
 
           <section id="universe">
             <h2>What agents can trade</h2>
-            <p>When you spawn an agent you choose which of these it may touch. Launchpad coins are rescanned every minute.</p>
+            <p>When you spawn an agent you choose which of these it may touch. Stock-paired coins are rescanned every minute.</p>
             <div className="mkts-wrap">
               <table className="docs-table">
                 <thead><tr><th>Type</th><th>What it is</th></tr></thead>
@@ -147,7 +147,7 @@ export default function Docs() {
                 </tbody>
               </table>
             </div>
-            <p>A launchpad coin only joins the universe if it clears a minimum market cap and 24h volume <b>and</b> a $10 test trade through Jupiter succeeds. Coins that fall below the bar are dropped from new trades.</p>
+            <p>A stock-paired coin only joins the universe if it clears a minimum market cap and 24h volume <b>and</b> a $10 test trade through Jupiter succeeds. Coins that fall below the bar are dropped from new trades.</p>
           </section>
 
           <section id="fees">
@@ -156,7 +156,7 @@ export default function Docs() {
               <li><b>No Stock Quant fee.</b> The platform doesn't take a cut of deposits, trades or profits.</li>
               <li><b>Pool fees</b> are paid to the liquidity pools a trade routes through (for example 0.25% on stonk.fun's Raydium pools). They're included in every quote.</li>
               <li><b>Network fees</b> come out of the agent's SOL balance. If it drops below {LIMITS.minGasSol} SOL the agent pauses itself until you top up.</li>
-              <li><b>Slippage limits:</b> {LIMITS.slippageBpsStock / 100}% on stocks, {LIMITS.slippageBpsPair / 100}% on launchpad coins. Any trade whose price impact is above {LIMITS.maxPriceImpactPct}% is skipped.</li>
+              <li><b>Slippage limits:</b> {LIMITS.slippageBpsStock / 100}% on stocks, {LIMITS.slippageBpsPair / 100}% on stock-paired coins. Any trade whose price impact is above {LIMITS.maxPriceImpactPct}% is skipped.</li>
               <li><b>Beta caps:</b> ${LIMITS.maxDepositUsd} per agent, {LIMITS.maxAgentsPerWallet} agents per wallet, at most {LIMITS.maxOrdersPerRebalance} trades per rebalance.</li>
             </ul>
           </section>
@@ -186,7 +186,7 @@ export default function Docs() {
 
           <section id="risks">
             <h2>Risks &amp; regions</h2>
-            <div className="banner">Agents trade real funds on Solana mainnet and can lose some or all of them. Strategies are simple rules, not financial advice. Launchpad coins are community launches and can go to zero quickly. Smart contracts, issuers, routers and key-management services can fail.</div>
+            <div className="banner">Agents trade real funds on Solana mainnet and can lose some or all of them. Strategies are simple rules, not financial advice. Stock-paired coins are community-launched and can go to zero quickly. Smart contracts, issuers, routers and key-management services can fail.</div>
             <p>xStocks and PreStocks are not offered to persons in restricted jurisdictions, including the United States. Spawning and deposits are blocked from restricted regions. You're responsible for following the rules where you live.</p>
           </section>
         </main>

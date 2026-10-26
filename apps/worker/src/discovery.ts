@@ -4,7 +4,7 @@ import { env } from "./env";
 import { getQuote } from "./jupiter";
 
 /**
- * Finds launchpad coins tied to tokenized stocks and keeps the liquid, routable ones in the
+ * Finds coins tied to tokenized stocks and keeps the liquid, routable ones in the
  * tradable universe:
  *   pair  – stonk.fun coins launched against xStocks / PreStocks
  *   pump  – pump.fun "custom pairs" coins quoted in xStocks / PreStocks (bonding curve or PumpSwap)

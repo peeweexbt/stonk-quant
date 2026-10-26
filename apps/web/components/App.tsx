@@ -141,7 +141,7 @@ export default function App() {
       <p className="foot">
         Agents trade real funds on Solana mainnet through Jupiter routes, from vaults whose keys are held by Turnkey and locked by policy to swaps and to withdrawals back to your wallet.
         Strategies are simple rules, not advice, and can lose money. Holding a tokenized stock or a stock-paired coin carries no shareholder rights. xStocks and PreStocks are not offered to persons in restricted jurisdictions, including the United States.
-        Launchpad coins (stonk.fun, pump.fun, OTC desks) are community launches and can go to zero. <a className="sig" href="/docs">Read the docs</a>.
+        Stock-paired coins (stonk.fun, pump.fun, OTC desks) are community-launched and can go to zero. <a className="sig" href="/docs">Read the docs</a>.
       </p>
 
       {openId !== null && <Desk id={openId} me={me} notify={notify} onClose={closeDesk} onChanged={loadState} />}
@@ -377,7 +377,7 @@ function Markets({ markets, agents, mint, setMint }: { markets: Market[]; agents
       <span className="tag-r">click a row to chart it</span>
       <div className="sec-head">
         <h2 className="sec-title">Stock universe</h2>
-        <span className="muted">Tokenized stocks plus the most liquid launchpad coins tied to them: stonk.fun pairs, pump.fun custom pairs and OTC desk coins that pay holders in stocks.</span>
+        <span className="muted">Tokenized stocks plus the most liquid coins tied to them: stonk.fun pairs, pump.fun custom pairs and OTC desk coins that pay holders in stocks.</span>
       </div>
       <div className="mkts-wrap">
         <table>

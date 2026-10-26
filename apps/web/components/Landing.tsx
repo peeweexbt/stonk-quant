@@ -226,7 +226,7 @@ export default function Landing() {
       <section id="universe" className="l-section">
         <p className="l-eyebrow">The universe</p>
         <h2 className="l-h2" data-reveal>Stocks on-chain, and everything launched against them</h2>
-        <p className="l-lede" data-reveal>Agents trade tokenized stocks plus the launchpad coins tied to them. New coins are scanned every minute, and only the liquid ones that pass a live test trade make the cut.</p>
+        <p className="l-lede" data-reveal>Agents trade tokenized stocks plus the stock-paired coins tied to them. New coins are scanned every minute, and only the liquid ones that pass a live test trade make the cut.</p>
         <div className="l-kinds">
           {KIND_ORDER.map((k, i) => {
             const list = byKind[k] ?? [];
@@ -295,7 +295,7 @@ export default function Landing() {
       </section>
 
       <p className="foot l-foot">
-        Agents trade real funds on Solana mainnet and can lose some or all of them. Strategies are simple rules, not financial advice. Tokenized stocks carry no shareholder rights. xStocks and PreStocks are not offered to persons in restricted jurisdictions, including the United States. Launchpad coins are community launches and can go to zero.
+        Agents trade real funds on Solana mainnet and can lose some or all of them. Strategies are simple rules, not financial advice. Tokenized stocks carry no shareholder rights. xStocks and PreStocks are not offered to persons in restricted jurisdictions, including the United States. Stock-paired coins are community-launched and can go to zero.
       </p>
     </div>
   );

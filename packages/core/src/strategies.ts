@@ -15,8 +15,8 @@ export const STRATS: Record<StratKey, StratDef> = {
   MOMENTUM: { label: "Momentum Monk", hat: ["   .-^-.   "], cad: 15, uni: ["xstock", "prestock", "pair", "pump", "otc", "stonk"], desc: "Rides the three strongest 60-minute trends." },
   MEANREV: { label: "Reversion Goblin", hat: ["   /\\ /\\   "], cad: 20, uni: ["xstock", "prestock", "stonk"], desc: "Buys stretched dips back toward the 2-hour mean." },
   INDEX: { label: "Index Hugger", hat: ["   ▄▄▄▄▄   "], cad: 240, uni: ["xstock"], desc: "Holds a cap-weighted xStock basket, rebalances lazily." },
-  PREIPO: { label: "Pre-IPO Prophet", hat: ["    /^\\    "], cad: 60, uni: ["prestock", "pair", "pump"], desc: "PreStocks plus the launchpad coins quoted in them." },
-  SNIPER: { label: "Pair Sniper", hat: ["  ==[+]==  "], cad: 5, uni: ["pair", "pump", "otc"], desc: "Hunts breakouts on stock-paired launchpad coins, quick exits." },
+  PREIPO: { label: "Pre-IPO Prophet", hat: ["    /^\\    "], cad: 60, uni: ["prestock", "pair", "pump"], desc: "PreStocks plus the coins quoted in them." },
+  SNIPER: { label: "Pair Sniper", hat: ["  ==[+]==  "], cad: 5, uni: ["pair", "pump", "otc"], desc: "Hunts breakouts on stock-paired coins, quick exits." },
   BURNER: { label: "Flywheel Farmer", hat: ["   ( ) )   ", "   ) ( (   "], cad: 120, uni: ["stonk", "pair", "otc"], desc: "Stacks STONK and the strongest reward-paying coins." },
 };
 
@@ -241,7 +241,7 @@ function rawTargets(ag: AgentView, market: MarketAsset[]): TargetResult {
       pairs.filter((a) => !raw[a.mint] && ret(a, 15) > 0.05 * E && ret(a, 3) > 0).sort((a, b) => ret(b, 15) - ret(a, 15)).slice(0, slots).forEach((a) => (raw[a.mint] = 1));
       norm(raw);
       const hottest = pairs.slice().sort((a, b) => ret(b, 15) - ret(a, 15))[0];
-      return { w, band: 0.05, note: exit || (hottest ? `scanning ${pairs.length} curves, hottest ${hottest.sym} ${pct(ret(hottest, 15))} 15m` : "needs launchpad coins in its universe") };
+      return { w, band: 0.05, note: exit || (hottest ? `scanning ${pairs.length} curves, hottest ${hottest.sym} ${pct(ret(hottest, 15))} 15m` : "needs stock-paired coins in its universe") };
     }
     case "BURNER": {
       const raw: Record<string, number> = {};
