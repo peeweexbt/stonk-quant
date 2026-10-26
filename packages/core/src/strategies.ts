@@ -1,4 +1,5 @@
 import { INDEX_WEIGHTS, STONK_MINT, isLaunchCoin, type AssetKind } from "./assets";
+import type { ExitWhy, Learn } from "./learn";
 
 export type StratKey = "MOMENTUM" | "MEANREV" | "INDEX" | "PREIPO" | "SNIPER" | "BURNER";
 
@@ -46,6 +47,8 @@ export interface AgentView {
   entryAt?: Record<string, number>;
   /** USDC on hand (needed to turn position values into weights) */
   cash?: number;
+  /** parameters this agent has learned from its own closed trades */
+  learn?: Learn;
 }
 
 /** Minimum minutes a strategy holds a new position before it may sell it (risk exits excepted). Cuts fee churn. */
@@ -66,7 +69,7 @@ export const RISK_RULES: Record<AssetKind, { stop: number; arm: number; trail: n
 export const RISK_COOLDOWN_MS = 6 * 3600_000;
 const SPY_MINT = "XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W";
 
-export interface RiskExit { mint: string; reason: string }
+export interface RiskExit { mint: string; reason: string; why: ExitWhy }
 
 /** Positions that must be closed now: stop-loss hit, or a winner gave back its trailing buffer. */
 export function riskExits(ag: AgentView, market: MarketAsset[]): RiskExit[] {
@@ -78,10 +81,11 @@ export function riskExits(ag: AgentView, market: MarketAsset[]): RiskExit[] {
     const e = ag.entry[m];
     if (!a || !e) continue;
     const p = last(a), rule = RISK_RULES[a.kind];
+    const stop = rule.stop * (ag.learn?.stop ?? 1), trail = rule.trail * (ag.learn?.trail ?? 1);
     const pk = Math.max(ag.peak?.[m] ?? p, p);
     const pnl = p / e - 1;
-    if (pnl <= -rule.stop) out.push({ mint: m, reason: `stop-loss ${a.sym} at ${pct(pnl)}` });
-    else if (pk / e - 1 >= rule.arm && p / pk - 1 <= -rule.trail) out.push({ mint: m, reason: `took profit on ${a.sym} at ${pct(pnl)}` });
+    if (pnl <= -stop) out.push({ mint: m, why: "stop", reason: `stop-loss ${a.sym} at ${pct(pnl)}` });
+    else if (pk / e - 1 >= rule.arm && p / pk - 1 <= -trail) out.push({ mint: m, why: "trail", reason: `took profit on ${a.sym} at ${pct(pnl)}` });
   }
   return out;
 }
@@ -138,7 +142,12 @@ export function computeTargets(ag: AgentView, market: MarketAsset[]): TargetResu
   const visible = cooled.size ? market.filter((a) => !cooled.has(a.mint) || (ag.values[a.mint] ?? 0) > 1) : market;
   const r = rawTargets(ag, visible);
   const kinds = new Map(market.map((a) => [a.mint, a.kind]));
+  // learned sizing per asset type (bounded 0.5–1.5×), never above the risk dial's exposure or the position caps
+  const kw = ag.learn?.kind ?? {};
+  for (const m in r.w) r.w[m] *= kw[kinds.get(m) ?? "pair"] ?? 1;
   for (const m in r.w) r.w[m] = Math.min(r.w[m], POSITION_CAP[kinds.get(m) ?? "pair"]);
+  const tot = Object.values(r.w).reduce((s, x) => s + x, 0), ex = exposure(ag.risk);
+  if (tot > ex) for (const m in r.w) r.w[m] *= ex / tot;
   for (const m of cooled) delete r.w[m];
 
   const notes: string[] = [];
@@ -167,6 +176,7 @@ export function computeTargets(ag: AgentView, market: MarketAsset[]): TargetResu
 function rawTargets(ag: AgentView, market: MarketAsset[]): TargetResult {
   const U = market.filter((a) => ag.uni.includes(a.kind) && a.h.length >= MIN_HISTORY && last(a) > 0);
   const ex = exposure(ag.risk);
+  const E = ag.learn?.entry ?? 1; // learned entry strictness
   const w: Record<string, number> = {};
   const norm = (raw: Record<string, number>) => {
     const s = Object.values(raw).reduce((x, y) => x + y, 0);
@@ -179,7 +189,7 @@ function rawTargets(ag: AgentView, market: MarketAsset[]): TargetResult {
       // Hold winners while their hourly trend stays positive; only add a new name on a clear trend.
       // Equal weights + a wide band keep turnover (and fees) low.
       const held = U.filter((a) => (ag.values[a.mint] ?? 0) > 1 && ret(a, 60) > -0.004 && ret(a, 120) > -0.006);
-      const fresh = U.filter((a) => !held.includes(a) && ret(a, 60) > 0.008 && ret(a, 120) > 0.008 && ret(a, 15) > 0)
+      const fresh = U.filter((a) => !held.includes(a) && ret(a, 60) > 0.008 * E && ret(a, 120) > 0.008 * E && ret(a, 15) > 0)
         .sort((a, b) => ret(b, 60) - ret(a, 60)).slice(0, Math.max(0, 3 - held.length));
       const pick = [...held, ...fresh].slice(0, 3);
       const raw: Record<string, number> = {};
@@ -191,7 +201,7 @@ function rawTargets(ag: AgentView, market: MarketAsset[]): TargetResult {
       // Buy only real stretches (≤ -1.2σ), hold until price is back to its mean, then exit.
       const z = U.map((a) => [a, (last(a) / sma(a, 120) - 1) / (stdRet(a, 120) * Math.sqrt(120))] as const);
       const holding = z.filter(([a, v]) => (ag.values[a.mint] ?? 0) > 1 && v < 0);
-      const fresh = z.filter(([a, v]) => !((ag.values[a.mint] ?? 0) > 1) && v < -1.2).sort((a, b) => a[1] - b[1]).slice(0, Math.max(0, 3 - holding.length));
+      const fresh = z.filter(([a, v]) => !((ag.values[a.mint] ?? 0) > 1) && v < -1.2 * E).sort((a, b) => a[1] - b[1]).slice(0, Math.max(0, 3 - holding.length));
       const pick = [...holding, ...fresh].slice(0, 3);
       const raw: Record<string, number> = {};
       pick.forEach(([a]) => (raw[a.mint] = 1));
@@ -223,12 +233,12 @@ function rawTargets(ag: AgentView, market: MarketAsset[]): TargetResult {
       pairs.forEach((a) => {
         if ((ag.values[a.mint] || 0) > 1) {
           const pnl = last(a) / (ag.entry[a.mint] || last(a)) - 1;
-          if (pnl > 0.18 || pnl < -0.09) { exit = `${a.sym} ${pnl > 0 ? "take-profit" : "stop-loss"} at ${pct(pnl)}`; return; }
+          if (pnl > 0.18 * (ag.learn?.trail ?? 1) || pnl < -0.09 * (ag.learn?.stop ?? 1)) { exit = `${a.sym} ${pnl > 0 ? "take-profit" : "stop-loss"} at ${pct(pnl)}`; return; }
           raw[a.mint] = 1;
         }
       });
       const slots = Math.max(0, 2 - Object.keys(raw).length);
-      pairs.filter((a) => !raw[a.mint] && ret(a, 15) > 0.05 && ret(a, 3) > 0).sort((a, b) => ret(b, 15) - ret(a, 15)).slice(0, slots).forEach((a) => (raw[a.mint] = 1));
+      pairs.filter((a) => !raw[a.mint] && ret(a, 15) > 0.05 * E && ret(a, 3) > 0).sort((a, b) => ret(b, 15) - ret(a, 15)).slice(0, slots).forEach((a) => (raw[a.mint] = 1));
       norm(raw);
       const hottest = pairs.slice().sort((a, b) => ret(b, 15) - ret(a, 15))[0];
       return { w, band: 0.05, note: exit || (hottest ? `scanning ${pairs.length} curves, hottest ${hottest.sym} ${pct(ret(hottest, 15))} 15m` : "needs launchpad coins in its universe") };

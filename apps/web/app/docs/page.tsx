@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { KIND_LABEL, LIMITS, MIN_HOLD_MIN, POSITION_CAP, RISK_RULES, STRATS, STRAT_KEYS, exposure, type AssetKind } from "@stonkquant/core";
+import { KIND_LABEL, LEARN_BOUNDS, LEARN_MIN, LEARN_WINDOW, LIMITS, MIN_HOLD_MIN, POSITION_CAP, RISK_RULES, STRATS, STRAT_KEYS, exposure, type AssetKind } from "@stonkquant/core";
 import { spriteText } from "@/components/sprite-text";
 
 export const metadata: Metadata = {
@@ -13,6 +13,7 @@ const TOC: [string, string][] = [
   ["vaults", "Agent vaults & custody"],
   ["strategies", "Strategies"],
   ["risk", "Risk dial & rebalancing"],
+  ["learning", "Learning from trades"],
   ["universe", "What agents can trade"],
   ["fees", "Fees & limits"],
   ["withdraw", "Withdrawing"],
@@ -120,6 +121,19 @@ export default function Docs() {
             </ul>
           </section>
 
+          <section id="learning">
+            <h2>Learning from trades</h2>
+            <p>Every agent, real and simulated, learns from its own closed trades. It doesn't invent new strategies or take more risk than its dial allows. It adjusts four bounded knobs, using its last {LEARN_WINDOW} closed trades, once it has at least {LEARN_MIN}.</p>
+            <ul>
+              <li><b>Entry strictness</b> ({LEARN_BOUNDS.entry[0]}–{LEARN_BOUNDS.entry[1]}×): when it loses more often than it wins, it waits for stronger signals before buying. When it wins more often, it relaxes a little. Applies to Momentum, Reversion and Pair Sniper.</li>
+              <li><b>Stop width</b> ({LEARN_BOUNDS.stop[0]}–{LEARN_BOUNDS.stop[1]}×): if losers cost more than winners pay, stops tighten. If stops fire often but the trades that survive pay well, stops widen so good trades aren't shaken out.</li>
+              <li><b>Trail room</b> ({LEARN_BOUNDS.trail[0]}–{LEARN_BOUNDS.trail[1]}×): if winners hand back most of their best gain before exiting, the trailing take-profit tightens. If they keep most of it, winners get more room to run.</li>
+              <li><b>Size per asset type</b> ({LEARN_BOUNDS.kind[0]}–{LEARN_BOUNDS.kind[1]}×): asset types that keep losing get smaller positions, ones that keep paying get a larger share. Thin samples count for less. Position caps and the risk dial still apply on top.</li>
+            </ul>
+            <p>Each change moves only part of the way toward its new target, so one lucky or unlucky trade can't swing the agent. Every adjustment is written to the agent log, and the desk shows the current settings, win rate and average win and loss.</p>
+            <p className="note-sm">Learning from past trades doesn't guarantee future profits. Markets change, and a pattern that paid last week can stop working. Fewer than ~30 trades is a small sample.</p>
+          </section>
+
           <section id="universe">
             <h2>What agents can trade</h2>
             <p>When you spawn an agent you choose which of these it may touch. Launchpad coins are rescanned every minute.</p>
@@ -166,6 +180,7 @@ export default function Docs() {
             <details><summary>What happens if a trade fails?</summary><p>It's logged in red on the desk and retried on the next rebalance. Nothing is lost; the USDC simply stays in the vault.</p></details>
             <details><summary>Does a tokenized stock make me a shareholder?</summary><p>No. Tokenized stocks and stock-paired coins track prices but carry no voting, dividend or ownership rights in the company.</p></details>
             <details><summary>What are the SIM agents on the floor?</summary><p>They're simulated agents, one per strategy, that paper-trade on the same live prices with $1,000 of pretend USDC. They run conservative presets (low risk, patient rebalancing, liquid assets) that any real agent can also choose, and the same risk rules as real agents. They show how each strategy behaves, including when it loses. They hold no funds, never trade on-chain, and are left out of the platform totals (assets, P&amp;L, trades, volume). They're always tagged SIM with a dashed border.</p></details>
+            <details><summary>Does my agent get smarter over time?</summary><p>It tunes itself, within limits. After {LEARN_MIN} closed trades it adjusts its entry strictness, stops, trailing exits and per-asset sizing from its own results (see <a href="#learning">Learning from trades</a>). Small vaults that rarely trade learn slowly. It can still lose money.</p></details>
             <details><summary>Who can see my agent?</summary><p>Everyone. The floor shows every agent, its strategy and P&amp;L, and the vault address is public on Solana. Only you can control it or withdraw from it.</p></details>
           </section>
 

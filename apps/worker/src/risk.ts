@@ -1,6 +1,6 @@
-import { RISK_COOLDOWN_MS, riskExits, type AgentView, type MarketAsset } from "@stonkquant/core";
+import { RISK_COOLDOWN_MS, learnFrom, riskExits, type AgentView, type AssetKind, type ExitWhy, type Learn, type MarketAsset } from "@stonkquant/core";
 
-export interface RiskState { entry: Record<string, number>; peak?: Record<string, number>; cooldown?: Record<string, number>; entryAt?: Record<string, number> }
+export interface RiskState { entry: Record<string, number>; peak?: Record<string, number>; cooldown?: Record<string, number>; entryAt?: Record<string, number>; learn?: Learn }
 
 /** Track the high-water mark of each held position and drop stale cooldowns. Returns true if anything changed. */
 export function updatePeaks(state: RiskState, values: Record<string, number>, priceOf: (m: string) => number | undefined): boolean {
@@ -25,4 +25,19 @@ export function needsRiskExit(view: AgentView, market: MarketAsset[]) {
 export function startCooldowns(state: RiskState, mints: string[]) {
   const cd = (state.cooldown ??= {});
   for (const m of mints) cd[m] = Date.now() + RISK_COOLDOWN_MS;
+}
+
+/**
+ * A position was fully closed: feed the result into the agent's learner.
+ * Call BEFORE the entry price is deleted. `r` is the realised return after fees and slippage.
+ * Returns a human-readable note when the learned parameters moved, else null.
+ */
+export function learnClose(state: RiskState, mint: string, kind: AssetKind | undefined, sym: string, r: number, why: ExitWhy): string | null {
+  if (!kind || !Number.isFinite(r)) return null;
+  const e = state.entry[mint];
+  const pk = e && state.peak?.[mint] ? state.peak[mint] / e - 1 : Math.max(0, r);
+  const at = state.entryAt?.[mint];
+  const { learn, change } = learnFrom(state.learn, { k: kind, s: sym, r, pk, why, min: at ? Math.round((Date.now() - at) / 60_000) : 0, t: Date.now() });
+  state.learn = learn;
+  return change;
 }

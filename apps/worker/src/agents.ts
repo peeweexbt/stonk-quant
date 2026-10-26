@@ -5,14 +5,14 @@ import {
   createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { LIMITS, STRATS, USDC_MINT, computeTargets, planOrders, type AssetKind, type StratKey } from "@stonkquant/core";
+import { LIMITS, STRATS, USDC_MINT, computeTargets, planOrders, type AssetKind, type Learn, type StratKey } from "@stonkquant/core";
 import { sql, logEvent } from "./db";
 import { env } from "./env";
 import { market } from "./market";
 import { connection, getBalances, priorityIx, signAndSend, type Balances } from "./solana";
 import { buildSwap, getQuote } from "./jupiter";
 import { createAgentWallet, createWithdrawPolicy } from "./turnkey";
-import { needsRiskExit, startCooldowns, updatePeaks } from "./risk";
+import { learnClose, needsRiskExit, startCooldowns, updatePeaks } from "./risk";
 
 export interface AgentRow {
   id: number;
@@ -30,7 +30,7 @@ export interface AgentRow {
   equity_usd: number;
   cash_usd: number;
   holdings: Record<string, Holding>;
-  state: { entry?: Record<string, number>; peak?: Record<string, number>; cooldown?: Record<string, number>; entryAt?: Record<string, number>; lastThinkAt?: number; lastNote?: string };
+  state: { entry?: Record<string, number>; peak?: Record<string, number>; cooldown?: Record<string, number>; entryAt?: Record<string, number>; lastThinkAt?: number; lastNote?: string; learn?: Learn };
   note: string | null;
   trades: number;
   volume_usd: number;
@@ -166,7 +166,7 @@ export async function runLive(ag: AgentRow, minute: number) {
 
   const state = { ...ag.state, entry: { ...(ag.state.entry ?? {}) }, peak: { ...(ag.state.peak ?? {}) }, cooldown: { ...(ag.state.cooldown ?? {}) }, entryAt: { ...(ag.state.entryAt ?? {}) } };
   const peaksChanged = updatePeaks(state, s.values, (m) => market.price(m));
-  const view = { strat: ag.strat, risk: ag.risk, uni: ag.uni, values: s.values, cash: s.cash, entry: state.entry, peak: state.peak, cooldown: state.cooldown, entryAt: state.entryAt };
+  const view = { strat: ag.strat, risk: ag.risk, uni: ag.uni, values: s.values, cash: s.cash, entry: state.entry, peak: state.peak, cooldown: state.cooldown, entryAt: state.entryAt, learn: state.learn };
   // Stop-losses and trailing take-profits are checked every minute, not just at rebalance time.
   const due = !ag.last_rebalance_at || Date.now() - new Date(ag.last_rebalance_at).getTime() >= cadenceMinutes(ag) * 60_000 - 5_000 || needsRiskExit(view, market.view());
   if (!due) {
@@ -177,6 +177,7 @@ export async function runLive(ag: AgentRow, minute: number) {
 
   const t = computeTargets(view, market.view());
   startCooldowns(state, t.exits.map((x) => x.mint));
+  const exitWhy = new Map(t.exits.map((x) => [x.mint, x.why]));
   const allOrders = planOrders(s.values, s.cash, t, LIMITS.minTradeUsd, 999);
   const orders = allOrders.slice(0, LIMITS.maxOrdersPerRebalance);
   // If we had to cap the order count, come back in ~2 minutes instead of a full cadence.
@@ -210,10 +211,17 @@ export async function runLive(ag: AgentRow, minute: number) {
           if (amt === 0n) continue;
           const r = await swap(ag, o.mint, USDC_MINT, amt, slippageFor(o.mint));
           const got = Number(r.outAmount) / 1e6;
-          const soldUi = Number(amt) / 10 ** tb.decimals;
+          // ui amounts (not raw/decimals) so scaled-UI xStocks report the real quantity
+          const soldUi = o.fraction >= 0.999 ? tb.ui : tb.ui * o.fraction;
           const pnl = state.entry[o.mint] ? price / state.entry[o.mint] - 1 : 0;
-          if (o.fraction >= 0.999) delete state.entry[o.mint];
+          let learned: string | null = null;
+          if (o.fraction >= 0.999) {
+            const e = state.entry[o.mint];
+            if (e && soldUi > 0) learned = learnClose(state, o.mint, a?.kind, sym, got / (soldUi * e) - 1, exitWhy.get(o.mint) ?? "signal");
+            delete state.entry[o.mint];
+          }
           await logEvent(ag.id, "sell", `SELL ${qty(soldUi)} ${sym} @ ${px(price)} for ${usd(got)}${pnl ? ` (${pnl >= 0 ? "+" : ""}${(pnl * 100).toFixed(1)}%)` : ""}`, r.sig);
+          if (learned) await logEvent(ag.id, "learn", learned);
           volume += got;
         } else {
           const usdcRaw = s.bal.tokens[USDC_MINT]?.raw ?? 0n;

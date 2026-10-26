@@ -178,7 +178,7 @@ button { cursor: pointer; }
 .feed div { display: grid; grid-template-columns: 6ch 10ch minmax(0,1fr); gap: 6px; padding: 2px 0; border-bottom: 1px dotted var(--line); }
 .feed .t { color: var(--muted); }
 .feed .who { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.feed .buy { color: var(--up); } .feed .sell { color: var(--down); } .feed .evt { color: var(--cyan); } .feed .rew { color: var(--violet); }
+.feed .buy { color: var(--up); } .feed .sell { color: var(--down); } .feed .evt { color: var(--cyan); } .feed .rew { color: var(--violet); } .feed .learn { color: var(--violet); }
 
 /* markets */
 .mkts-wrap { overflow-x: auto; }
@@ -371,3 +371,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   .l-logo, .caret, .l-walker, .l-packet { animation: none; }
   .js-reveal [data-reveal] { opacity: 1; transform: none; transition: none; }
 }
+
+/* learning panel (agent desk) */
+.learn { border: 1px solid var(--line); background: var(--panel-2); padding: 12px 14px; margin-top: 16px; }
+.learn-bar { font-size: 14px; letter-spacing: .1em; margin-top: 8px; }
+.learn-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.learn-stats b { color: var(--fg); font-weight: 500; }
+.learn-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 24px; margin-top: 10px; font-size: 12px; }
+.learn-grid > div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; }
+.learn-grid .learn-m { color: var(--violet); letter-spacing: -.02em; white-space: nowrap; }
+.learn-grid b { color: var(--fg); font-weight: 500; min-width: 3.4em; text-align: right; }
+@media (max-width: 640px) { .learn-grid { grid-template-columns: 1fr; } }

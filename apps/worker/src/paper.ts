@@ -4,7 +4,7 @@ import { sql, logEvent } from "./db";
 import { env } from "./env";
 import { market } from "./market";
 import type { AgentRow, Holding } from "./agents";
-import { needsRiskExit, startCooldowns, updatePeaks } from "./risk";
+import { learnClose, needsRiskExit, startCooldowns, updatePeaks } from "./risk";
 
 export const SIM_OWNER = "simulated";
 
@@ -78,7 +78,7 @@ export async function runPaper(ag: AgentRow, minute: number) {
   const state = { ...st, entry: { ...(st.entry ?? {}) }, peak: { ...(st.peak ?? {}) }, cooldown: { ...(st.cooldown ?? {}) }, entryAt: { ...(st.entryAt ?? {}) }, paper };
   const pre = snapshot(paper, state.entry);
   const peaksChanged = updatePeaks(state, pre.values, (m) => market.price(m));
-  const view = () => ({ strat: ag.strat, risk: ag.risk, uni: ag.uni, values: snapshot(paper, state.entry).values, cash: paper.cash, entry: state.entry, peak: state.peak, cooldown: state.cooldown, entryAt: state.entryAt });
+  const view = () => ({ strat: ag.strat, risk: ag.risk, uni: ag.uni, values: snapshot(paper, state.entry).values, cash: paper.cash, entry: state.entry, peak: state.peak, cooldown: state.cooldown, entryAt: state.entryAt, learn: state.learn });
   let trades = 0, volume = 0, rebalanced = false;
 
   const cad = Math.max(1, Math.round(STRATS[ag.strat].cad * (ag.cadence_mul || 1)));
@@ -90,6 +90,7 @@ export async function runPaper(ag: AgentRow, minute: number) {
     const s = snapshot(paper, state.entry);
     const t = computeTargets(view(), market.view());
     startCooldowns(state, t.exits.map((x) => x.mint));
+    const exitWhy = new Map(t.exits.map((x) => [x.mint, x.why]));
     const all = planOrders(s.values, paper.cash, t, LIMITS.minTradeUsd, 999);
     const orders = all.slice(0, LIMITS.maxOrdersPerRebalance);
     if (all.length > orders.length) nextOffsetMin = Math.max(0, cad - 2);
@@ -113,9 +114,15 @@ export async function runPaper(ag: AgentRow, minute: number) {
         const got = q * price * (1 - slip(k)) * (1 - FEE);
         const pnl = state.entry[o.mint] ? price / state.entry[o.mint] - 1 : 0;
         paper.qty[o.mint] = held - q;
-        if (paper.qty[o.mint] * price < 0.01) { delete paper.qty[o.mint]; delete state.entry[o.mint]; }
+        let learned: string | null = null;
+        if (paper.qty[o.mint] * price < 0.01) {
+          const e = state.entry[o.mint]; // excludes the buy fee, so add it back below
+          if (e) learned = learnClose(state, o.mint, k, sym, (got * (1 - FEE)) / (q * e) - 1, exitWhy.get(o.mint) ?? "signal");
+          delete paper.qty[o.mint]; delete state.entry[o.mint];
+        }
         paper.cash += got;
         await logEvent(ag.id, "sell", `SELL ${qtyFmt(q)} ${sym} @ ${px(price)} for ${fmt(got)}${pnl ? ` (${pnl >= 0 ? "+" : ""}${(pnl * 100).toFixed(1)}%)` : ""} · paper`);
+        if (learned) await logEvent(ag.id, "learn", learned);
         volume += got;
       } else {
         const spend = Math.min(o.usd, paper.cash);

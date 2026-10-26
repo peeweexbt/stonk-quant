@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ALL_KINDS, KIND_LABEL, STRATS, STRAT_KEYS, isLaunchCoin, type AssetKind, type StratKey } from "@stonkquant/core";
+import { ALL_KINDS, KIND_LABEL, LEARN_BOUNDS, LEARN_MIN, STRATS, STRAT_KEYS, isLaunchCoin, learnStats, type AssetKind, type Learn, type StratKey } from "@stonkquant/core";
 import { Sprite, spriteText, type Mood } from "./Sprite";
 import { asciiCandles, asciiSpark, figlet, sparkSvg } from "./chart";
 import { COLORS, acctUrl, cls, hhmm, pct, price, qty, short, txUrl, usd, usdShort } from "./format";
@@ -349,7 +349,7 @@ function Spawn({ me, onSignIn, notify, onCreated }: { me: Me | null; onSignIn: (
 /* ---------------- feed ---------------- */
 
 function Feed({ feed, onOpen }: { feed: FeedItem[]; onOpen: (id: number) => void }) {
-  const kind: Record<string, string> = { buy: "buy", sell: "sell", evt: "evt", boot: "evt", err: "sell" };
+  const kind: Record<string, string> = { buy: "buy", sell: "sell", evt: "evt", boot: "evt", err: "sell", learn: "learn" };
   return (
     <section className="frame">
       <span className="tag">Live tape</span>
@@ -406,7 +406,7 @@ function Markets({ markets, agents, mint, setMint }: { markets: Market[]; agents
 
 /* ---------------- desk ---------------- */
 
-interface Detail { agent: Agent & { cadence_mul: number; uni: AssetKind[]; error: string | null; sim?: boolean }; events: { id: string; ts: string; type: string; text: string; sig: string | null }[]; equity: number[]; deposits: { sig: string; usdc: number; sol: number; ts: string }[] }
+interface Detail { agent: Agent & { cadence_mul: number; uni: AssetKind[]; error: string | null; sim?: boolean; learn?: Learn | null }; events: { id: string; ts: string; type: string; text: string; sig: string | null }[]; equity: number[]; deposits: { sig: string; usdc: number; sol: number; ts: string }[] }
 
 function Desk({ id, me, notify, onClose, onChanged }: { id: number; me: Me | null; notify: (m: string, e?: boolean) => void; onClose: () => void; onChanged: () => void }) {
   const [d, setD] = useState<Detail | null>(null);
@@ -502,6 +502,8 @@ function Desk({ id, me, notify, onClose, onChanged }: { id: number; me: Me | nul
             </div>
           )}
 
+          <Learning L={a.learn ?? null} strat={a.strat} />
+
           <div className="m-chart" style={{ marginTop: 16 }} dangerouslySetInnerHTML={{ __html: sparkSvg(d.equity, p.abs >= 0 ? "var(--up)" : "var(--down)", 800, 140) }} />
 
           <div className="m-cols">
@@ -526,7 +528,7 @@ function Desk({ id, me, notify, onClose, onChanged }: { id: number; me: Me | nul
                 {d.events.map((l) => (
                   <div key={l.id}>
                     <span className="muted">{hhmm(l.ts)}</span>
-                    <span className={l.type === "buy" ? "up" : l.type === "sell" || l.type === "err" ? "down" : ""} style={l.type === "think" ? { color: "var(--muted)" } : l.type === "evt" || l.type === "boot" ? { color: "var(--cyan)" } : undefined}>
+                    <span className={l.type === "buy" ? "up" : l.type === "sell" || l.type === "err" ? "down" : ""} style={l.type === "think" ? { color: "var(--muted)" } : l.type === "evt" || l.type === "boot" ? { color: "var(--cyan)" } : l.type === "learn" ? { color: "var(--violet)" } : undefined}>
                       {l.type === "think" ? "· " : ""}{l.text}{l.sig && <> · <a className="sig" href={txUrl(l.sig)} target="_blank" rel="noreferrer">tx</a></>}
                     </span>
                   </div>
@@ -559,6 +561,61 @@ function Desk({ id, me, notify, onClose, onChanged }: { id: number; me: Me | nul
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------------- learning panel ---------------- */
+
+const LEARN_HELP: Record<string, string> = {
+  entry: "how strong a signal must be before it buys",
+  stop: "how far a position may fall before the stop-loss",
+  trail: "how much of a winner's gain it lets ride before taking profit",
+};
+const USES_ENTRY = new Set(["MOMENTUM", "MEANREV", "SNIPER"]);
+
+function meter(v: number, lo: number, hi: number) {
+  const n = 13, pos = Math.round(((v - lo) / (hi - lo)) * (n - 1)), mid = Math.round(((1 - lo) / (hi - lo)) * (n - 1));
+  let s = "";
+  for (let i = 0; i < n; i++) s += i === pos ? "●" : i === mid ? "┼" : "─";
+  return s;
+}
+
+function Learning({ L, strat }: { L: Learn | null; strat: string }) {
+  const n = L?.n ?? 0;
+  if (!L || n < LEARN_MIN) {
+    return (
+      <div className="learn">
+        <p className="sub-title" style={{ margin: 0 }}>Learning · {n}/{LEARN_MIN} closed trades</p>
+        <p className="note-sm">Warming up. After {LEARN_MIN} closed trades this agent starts tuning its entry strictness, stop and trailing exits, and how much it sizes each asset type, from its own wins and losses. Small steps, hard limits.</p>
+        <div className="learn-bar num"><span className="amber">{"█".repeat(n)}</span><span className="muted">{"░".repeat(LEARN_MIN - n)}</span></div>
+      </div>
+    );
+  }
+  const st = learnStats(L.recent);
+  const rows: [string, string, number, readonly [number, number]][] = [];
+  if (USES_ENTRY.has(strat)) rows.push(["entry", "Entry strictness", L.entry, LEARN_BOUNDS.entry]);
+  rows.push(["stop", "Stop width", L.stop, LEARN_BOUNDS.stop], ["trail", "Trail room", L.trail, LEARN_BOUNDS.trail]);
+  const kinds = Object.entries(L.kind) as [AssetKind, number][];
+  return (
+    <div className="learn">
+      <p className="sub-title" style={{ margin: 0 }}>Learning · from {n} closed trades</p>
+      <div className="learn-stats num">
+        <span>win rate <b>{Math.round(st.winRate * 100)}%</b></span>
+        <span>avg win <b className="up">{pct(st.avgWin, 1)}</b></span>
+        <span>avg loss <b className="down">{pct(-st.avgLoss, 1)}</b></span>
+        <span>per trade <b className={cls(st.expectancy)}>{pct(st.expectancy, 2)}</b></span>
+        <span className="muted">last {st.count}</span>
+      </div>
+      <div className="learn-grid num">
+        {rows.map(([k, label, v, b]) => (
+          <div key={k} title={LEARN_HELP[k]}><span className="muted">{label}</span><span className="learn-m">{meter(v, b[0], b[1])}</span><b>×{v.toFixed(2)}</b></div>
+        ))}
+        {kinds.map(([k, v]) => (
+          <div key={k} title="position size for this asset type"><span className="muted">{KIND_LABEL[k]} size</span><span className="learn-m">{meter(v, LEARN_BOUNDS.kind[0], LEARN_BOUNDS.kind[1])}</span><b>×{v.toFixed(2)}</b></div>
+        ))}
+      </div>
+      {L.last && <p className="note-sm" style={{ marginTop: 8 }}>Last adjustment{L.at ? ` ${hhmm(new Date(L.at).toISOString())}` : ""}: {L.last}</p>}
     </div>
   );
 }

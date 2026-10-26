@@ -11,7 +11,7 @@ export const sql = postgres(env.databaseUrl, {
   ssl: env.databaseUrl.includes("railway.internal") || env.databaseUrl.includes("localhost") ? false : "require",
 });
 
-export type EventType = "buy" | "sell" | "think" | "evt" | "err" | "boot";
+export type EventType = "buy" | "sell" | "think" | "evt" | "err" | "boot" | "learn";
 
 export async function logEvent(agentId: number, type: EventType, text: string, sig?: string | null) {
   await sql`INSERT INTO agent_events (agent_id, type, text, sig) VALUES (${agentId}, ${type}, ${text.slice(0, 400)}, ${sig ?? null})`;
