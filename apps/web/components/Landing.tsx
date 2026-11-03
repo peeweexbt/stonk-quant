@@ -114,7 +114,7 @@ export default function Landing() {
       {/* hero */}
       <section className="l-hero">
         <div className="l-hero-copy">
-          <pre className="logo l-logo" aria-label="Stock Quant">{figlet("STOCK")}{"\n"}<span className="q">{figlet("QUANT")}</span></pre>
+          <pre className="logo l-logo" aria-label="Stonk Quant">{figlet("STONK")}{"\n"}<span className="q">{figlet("QUANT")}</span></pre>
           <Typer lines={[
             "> spawning agent… ok",
             "> vault created · keys sealed in Turnkey",

@@ -24,6 +24,33 @@ const SIM_PROFILE: Record<StratKey, { risk: number; cad: number; uni: AssetKind[
   BURNER: { risk: 3, cad: 2.5, uni: ["stonk", "pair"] },
 };
 
+/**
+ * Bump this to wipe every simulated agent back to a fresh paper balance on the next worker boot:
+ * cash reset, positions/trades/volume/learning cleared, their log and equity history deleted.
+ * Runs once per value (remembered in the settings table). Real agents are never touched.
+ */
+const SIM_RESET_VERSION = "2026-11-03";
+
+export async function resetSimsIfNeeded() {
+  const [row] = await sql<{ v: string }[]>`SELECT v FROM settings WHERE k = 'sim_reset'`;
+  if (row?.v === SIM_RESET_VERSION) return;
+  const deposit = env.sim.deposit;
+  const state = { paper: { cash: deposit, qty: {} } };
+  const ids = (await sql<{ id: number }[]>`SELECT id FROM agents WHERE sim`).map((r) => r.id);
+  if (ids.length) {
+    await sql.begin(async (tx) => {
+      await tx`DELETE FROM agent_events WHERE agent_id = ANY(${ids})`;
+      await tx`DELETE FROM agent_equity WHERE agent_id = ANY(${ids})`;
+      await tx`UPDATE agents SET state = ${tx.json(state as any)}, deposited_usd = ${deposit}, withdrawn_usd = 0, equity_usd = ${deposit},
+        cash_usd = ${deposit}, holdings = '{}'::jsonb, trades = 0, volume_usd = 0, note = null, last_rebalance_at = null, updated_at = now()
+        WHERE id = ANY(${ids})`;
+    });
+    for (const id of ids) await logEvent(id, "boot", `reset to $${deposit} of paper USDC: fresh start, no trades, nothing learned yet`);
+  }
+  await sql`INSERT INTO settings (k, v) VALUES ('sim_reset', ${SIM_RESET_VERSION}) ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v, updated_at = now()`;
+  console.log(`[sim] reset ${ids.length} simulated agents (${SIM_RESET_VERSION})`);
+}
+
 /** Create (or retire) the simulated agents to match SIM_AGENTS. */
 export async function ensureSimAgents() {
   await sql`INSERT INTO users (wallet) VALUES (${SIM_OWNER}) ON CONFLICT DO NOTHING`;

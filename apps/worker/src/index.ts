@@ -4,7 +4,7 @@ import { migrate } from "./migrate";
 import { market } from "./market";
 import { discoverPairs } from "./discovery";
 import { checkFunding, loadAgents, provision, refreshOnly, runLive, withdraw, type AgentRow } from "./agents";
-import { ensureSimAgents, runPaper } from "./paper";
+import { ensureSimAgents, resetSimsIfNeeded, runPaper } from "./paper";
 
 const busy = new Set<number>();
 // Exponential backoff per agent after an error, so a stuck agent doesn't spam retries.
@@ -84,6 +84,7 @@ async function discoveryLoop() {
 async function main() {
   console.log(`stock-quant worker starting. trading=${env.tradingEnabled} withdrawals=${env.withdrawalsEnabled} jupiter=${env.jupiter.baseUrl}`);
   await migrate();
+  await resetSimsIfNeeded();
   await ensureSimAgents();
   await market.loadAssets();
   await market.loadHistory();

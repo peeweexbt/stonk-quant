@@ -3,8 +3,8 @@ import { KIND_LABEL, LEARN_BOUNDS, LEARN_MIN, LEARN_WINDOW, LIMITS, MIN_HOLD_MIN
 import { spriteText } from "@/components/sprite-text";
 
 export const metadata: Metadata = {
-  title: "Docs · Stock Quant",
-  description: "How Stock Quant agents work: vaults, strategies, the tradable universe, fees, limits and withdrawals.",
+  title: "Docs · Stonk Quant",
+  description: "How Stonk Quant agents work: vaults, strategies, the tradable universe, fees, limits and withdrawals.",
 };
 
 const TOC: [string, string][] = [
@@ -48,8 +48,8 @@ export default function Docs() {
 
         <main className="docs-body">
           <section id="overview">
-            <h1>How Stock Quant works</h1>
-            <p className="lede">Stock Quant runs trading agents for you. You spawn an agent, give it a strategy and a risk level, and fund its own Solana vault with USDC. The agent then trades tokenized stocks and the stock-paired coins tied to them on your behalf, around the clock. You can pause it, change its risk, top it up or withdraw everything back to your wallet at any time.</p>
+            <h1>How Stonk Quant works</h1>
+            <p className="lede">Stonk Quant runs trading agents for you. You spawn an agent, give it a strategy and a risk level, and fund its own Solana vault with USDC. The agent then trades tokenized stocks and the stock-paired coins tied to them on your behalf, around the clock. You can pause it, change its risk, top it up or withdraw everything back to your wallet at any time.</p>
             <div className="docs-flow">
               {["Connect Phantom", "Spawn an agent", "Fund its vault", "It trades", "Withdraw anytime"].map((s, i) => (
                 <div key={s} className="docs-step"><span className="num">{String(i + 1).padStart(2, "0")}</span>{s}</div>
@@ -72,7 +72,7 @@ export default function Docs() {
             <h2>Agent vaults &amp; custody</h2>
             <p>Every agent has its own Solana wallet. Funds never sit in a shared pool, and every vault is public on-chain, so anyone can check its balances and trades.</p>
             <ul>
-              <li><b>Keys are held by Turnkey</b>, a secure key-management service. The Stock Quant website never sees or stores a private key.</li>
+              <li><b>Keys are held by Turnkey</b>, a secure key-management service. The Stonk Quant website never sees or stores a private key.</li>
               <li><b>Signing is locked down by policy.</b> The trading key may only sign Jupiter swap transactions, with no direct SOL or token transfers. An agent can swap, but it can't send funds anywhere.</li>
               <li><b>Withdrawals only go to you.</b> When you withdraw, a one-off policy is created that lets that single vault send funds only to the wallet that owns it.</li>
               <li><b>USDC is home base.</b> Agents hold USDC between positions and every trade routes USDC ⇄ asset through Jupiter.</li>
@@ -153,7 +153,7 @@ export default function Docs() {
           <section id="fees">
             <h2>Fees &amp; limits</h2>
             <ul>
-              <li><b>No Stock Quant fee.</b> The platform doesn't take a cut of deposits, trades or profits.</li>
+              <li><b>No Stonk Quant fee.</b> The platform doesn't take a cut of deposits, trades or profits.</li>
               <li><b>Pool fees</b> are paid to the liquidity pools a trade routes through (for example 0.25% on stonk.fun's Raydium pools). They're included in every quote.</li>
               <li><b>Network fees</b> come out of the agent's SOL balance. If it drops below {LIMITS.minGasSol} SOL the agent pauses itself until you top up.</li>
               <li><b>Slippage limits:</b> {LIMITS.slippageBpsStock / 100}% on stocks, {LIMITS.slippageBpsPair / 100}% on stock-paired coins. Any trade whose price impact is above {LIMITS.maxPriceImpactPct}% is skipped.</li>
