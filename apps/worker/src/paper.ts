@@ -15,7 +15,7 @@ const SIM_NAMES: Record<StratKey, string> = {
 };
 // Conservative presets: lower risk, patient rebalancing (fewer fees), liquid assets only.
 // Every rule here is available to real agents too (same risk dial, cadence and universe options).
-const SIM_PROFILE: Record<StratKey, { risk: number; cad: number; uni: AssetKind[] }> = {
+export const SIM_PROFILE: Record<StratKey, { risk: number; cad: number; uni: AssetKind[] }> = {
   // cad = cadence multiplier on the strategy's base rebalance interval (sims trade slowly on purpose)
   MOMENTUM: { risk: 4, cad: 6, uni: ["xstock", "prestock", "stonk"] }, // every 90 min
   MEANREV: { risk: 4, cad: 6, uni: ["xstock", "prestock"] }, // every 2 h
@@ -30,7 +30,7 @@ const SIM_PROFILE: Record<StratKey, { risk: number; cad: number; uni: AssetKind[
  * cash reset, positions/trades/volume/learning cleared, their log and equity history deleted.
  * Runs once per value (remembered in the settings table). Real agents are never touched.
  */
-const SIM_RESET_VERSION = "2026-11-04";
+const SIM_RESET_VERSION = "2026-11-04-v2";
 
 export async function resetSimsIfNeeded() {
   const [row] = await sql<{ v: string }[]>`SELECT v FROM settings WHERE k = 'sim_reset'`;
@@ -103,10 +103,10 @@ function snapshot(paper: Paper, entry: Record<string, number>) {
 export async function runPaper(ag: AgentRow, minute: number) {
   const st = (ag.state ?? {}) as AgentRow["state"] & { paper?: Paper };
   const paper: Paper = st.paper ? { cash: st.paper.cash, qty: { ...st.paper.qty } } : { cash: ag.deposited_usd || env.sim.deposit, qty: {} };
-  const state = { ...st, entry: { ...(st.entry ?? {}) }, peak: { ...(st.peak ?? {}) }, cooldown: { ...(st.cooldown ?? {}) }, entryAt: { ...(st.entryAt ?? {}) }, paper };
+  const state = { ...st, engine: env.engine.sim, entry: { ...(st.entry ?? {}) }, peak: { ...(st.peak ?? {}) }, cooldown: { ...(st.cooldown ?? {}) }, entryAt: { ...(st.entryAt ?? {}) }, paper };
   const pre = snapshot(paper, state.entry);
   const peaksChanged = updatePeaks(state, pre.values, (m) => market.price(m));
-  const view = () => ({ strat: ag.strat, risk: ag.risk, uni: ag.uni, values: snapshot(paper, state.entry).values, cash: paper.cash, entry: state.entry, peak: state.peak, cooldown: state.cooldown, entryAt: state.entryAt, learn: state.learn });
+  const view = () => ({ strat: ag.strat, risk: ag.risk, uni: ag.uni, values: snapshot(paper, state.entry).values, cash: paper.cash, entry: state.entry, peak: state.peak, cooldown: state.cooldown, entryAt: state.entryAt, learn: state.learn, engine: env.engine.sim });
   let trades = 0, volume = 0, rebalanced = false;
 
   const cad = Math.max(1, Math.round(STRATS[ag.strat].cad * (ag.cadence_mul || 1)));

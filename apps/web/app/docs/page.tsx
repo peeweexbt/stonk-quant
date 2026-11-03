@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { KIND_LABEL, LEARN_BOUNDS, LEARN_MIN, LEARN_WINDOW, LIMITS, MIN_HOLD_MIN, POSITION_CAP, RISK_RULES, STRATS, STRAT_KEYS, exposure, type AssetKind } from "@stonkquant/core";
 import { spriteText } from "@/components/sprite-text";
+import { db } from "@/lib/db";
 import { CaChip } from "@/components/Ca";
 
 export const metadata: Metadata = {
@@ -14,6 +15,7 @@ const TOC: [string, string][] = [
   ["vaults", "Agent vaults & custody"],
   ["strategies", "Strategies"],
   ["risk", "Risk dial & rebalancing"],
+  ["engine", "Strategy engine v2 & backtests"],
   ["learning", "Learning from trades"],
   ["universe", "What agents can trade"],
   ["fees", "Fees & limits"],
@@ -31,7 +33,22 @@ const KIND_DESC: Record<AssetKind, string> = {
   stonk: "STONK, the stonk.fun platform token. Part of stonk.fun's fee buyback-and-burn.",
 };
 
-export default function Docs() {
+export const revalidate = 300;
+
+interface BtM { ret: number; maxDD: number; trades: number; winRate: number; sharpe: number }
+interface Bt { at: string; days: number; assets: number; lookaheadOk: boolean; results: { strat: keyof typeof STRATS; v1: BtM; v2: BtM }[] }
+
+async function latestBacktest(): Promise<Bt | null> {
+  try {
+    const [row] = await db()<{ v: string }[]>`SELECT v FROM settings WHERE k = 'backtest'`;
+    return row ? (JSON.parse(row.v) as Bt) : null;
+  } catch { return null; }
+}
+
+const sp = (x: number) => (x >= 0 ? "+" : "") + (x * 100).toFixed(2) + "%";
+
+export default async function Docs() {
+  const bt = await latestBacktest();
   return (
     <div className="app docs">
       <header className="topbar">
@@ -121,6 +138,32 @@ export default function Docs() {
               <li><b>Risk-off:</b> when SPYx is falling over 4 hours, agents halve their exposure to everything except xStocks.</li>
               <li>You can change risk or pause an agent from its desk at any time. A paused agent keeps its positions but stops trading.</li>
             </ul>
+          </section>
+
+          <section id="engine">
+            <h2>Strategy engine v2 &amp; backtests</h2>
+            <p>The v2 engine keeps each strategy's personality but makes three upgrades, built on well-known ideas from open quant research:</p>
+            <ul>
+              <li><b>Multi-factor picking.</b> Instead of one signal, coins are ranked on a blend of 4-hour momentum (skipping the last 15 minutes of noise), 1-hour momentum, closeness to their 8-hour high, lower volatility, and trend quality (how straight the move is). Reversion only buys dips in assets that aren't collapsing or in a clean downtrend.</li>
+              <li><b>Market regime filter.</b> SPYx's 4-hour trend and trend quality label the market up, down, choppy or calm. Each strategy scales its exposure to the regime: Momentum backs off in chop, everything but Index sharply cuts risk in a falling market, and new breakout buys stop when the market is falling.</li>
+              <li><b>Risk-based sizing.</b> Positions are sized by inverse volatility (Index blends cap weights with risk parity), near-duplicate holdings that move in lock-step are skipped, and existing positions move halfway toward their target each rebalance to cut fees.</li>
+            </ul>
+            <p>Every few hours the worker replays the last 7 days of real minute prices through both engines, with the same fees, slippage, risk rules and learning the agents use, and checks that no strategy can see future prices. <b>Simulated agents run v2 now; real agents stay on v1</b> until v2 holds up on real data.</p>
+            {bt ? (
+              <>
+                <div className="mkts-wrap">
+                  <table className="docs-table">
+                    <thead><tr><th>Strategy</th><th className="r">v1 return</th><th className="r">v1 max drawdown</th><th className="r">v2 return</th><th className="r">v2 max drawdown</th><th className="r">v2 trades</th></tr></thead>
+                    <tbody className="num">
+                      {bt.results.map((r) => (
+                        <tr key={r.strat}><td>{STRATS[r.strat]?.label ?? r.strat}</td><td className={"r " + (r.v1.ret >= 0 ? "up" : "down")}>{sp(r.v1.ret)}</td><td className="r">{sp(-r.v1.maxDD)}</td><td className={"r " + (r.v2.ret >= 0 ? "up" : "down")}>{sp(r.v2.ret)}</td><td className="r">{sp(-r.v2.maxDD)}</td><td className="r">{r.v2.trades}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="note-sm">Backtest of the last {bt.days.toFixed(1)} days across {bt.assets} assets, $1,000 per strategy on the SIM presets, updated {new Date(bt.at).toUTCString()}. Lookahead check {bt.lookaheadOk ? "passed" : "failed"}. Past performance, especially over one week, says little about the future.</p>
+              </>
+            ) : <p className="note-sm">The first backtest runs a few minutes after the worker starts.</p>}
           </section>
 
           <section id="learning">

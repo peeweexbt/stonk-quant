@@ -8,6 +8,7 @@
     "start": "tsx src/index.ts",
     "migrate": "tsx src/migrate.ts",
     "setup:turnkey": "tsx scripts/setup-turnkey.ts",
+    "backtest": "tsx scripts/backtest.ts",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {

@@ -1,5 +1,6 @@
 import { INDEX_WEIGHTS, STONK_MINT, isLaunchCoin, type AssetKind } from "./assets";
 import type { ExitWhy, Learn } from "./learn";
+import { devZ, dropCorrelated, effRatio, fromHigh, invVol, marketRegime, momSkip, retN, riskParity, scaleTo, vol, zs, type Regime } from "./quant";
 
 export type StratKey = "MOMENTUM" | "MEANREV" | "INDEX" | "PREIPO" | "SNIPER" | "BURNER";
 
@@ -49,6 +50,10 @@ export interface AgentView {
   cash?: number;
   /** parameters this agent has learned from its own closed trades */
   learn?: Learn;
+  /** strategy engine: v1 = original single-signal rules, v2 = multi-factor + regime + risk-based sizing */
+  engine?: "v1" | "v2";
+  /** clock override (epoch ms), used by the backtester */
+  now?: number;
 }
 
 /** Minimum minutes a strategy holds a new position before it may sell it (risk exits excepted). Cuts fee churn. */
@@ -136,11 +141,13 @@ export const MIN_HISTORY = 30;
 export const POSITION_CAP: Record<AssetKind, number> = { xstock: 0.5, prestock: 0.4, stonk: 0.4, pair: 0.2, pump: 0.15, otc: 0.15 };
 
 export function computeTargets(ag: AgentView, market: MarketAsset[]): TargetResult & { exits: RiskExit[] } {
-  const now = Date.now();
+  const now = ag.now ?? Date.now();
+  const v2 = ag.engine === "v2";
+  const regime = v2 ? marketRegime(market) : null;
   // assets on cooldown after a risk exit are invisible to the strategy
   const cooled = new Set(Object.entries(ag.cooldown ?? {}).filter(([, until]) => until > now).map(([m]) => m));
   const visible = cooled.size ? market.filter((a) => !cooled.has(a.mint) || (ag.values[a.mint] ?? 0) > 1) : market;
-  const r = rawTargets(ag, visible);
+  const r = v2 ? rawTargetsV2(ag, visible, regime!) : rawTargets(ag, visible);
   const kinds = new Map(market.map((a) => [a.mint, a.kind]));
   // learned sizing per asset type (bounded 0.5–1.5×), never above the risk dial's exposure or the position caps
   const kw = ag.learn?.kind ?? {};
@@ -165,7 +172,14 @@ export function computeTargets(ag: AgentView, market: MarketAsset[]): TargetResu
   }
   for (const x of exits) { r.w[x.mint] = 0; notes.push(x.reason); }
 
-  if (riskOff(market) && ag.strat !== "INDEX") {
+  if (v2) {
+    // turnover control: move existing positions halfway toward target instead of all at once (fewer fees)
+    const eq = (ag.cash ?? 0) + Object.values(ag.values).reduce((s, v) => s + v, 0);
+    if (eq > 0) for (const [m, v] of Object.entries(ag.values)) {
+      const cur = v / eq, tgt = r.w[m];
+      if (v > 1 && tgt && tgt > 0 && !exits.some((x) => x.mint === m)) r.w[m] = cur + 0.5 * (tgt - cur);
+    }
+  } else if (riskOff(market) && ag.strat !== "INDEX") {
     for (const m in r.w) { const k = kinds.get(m); if (k && k !== "xstock") r.w[m] *= 0.5; }
     notes.push("market risk-off: halving non-stock exposure");
   }
@@ -290,4 +304,104 @@ export function planOrders(values: Record<string, number>, cashUsd: number, t: T
     cash -= spend;
   }
   return [...sells, ...fundedBuys].slice(0, maxOrders);
+}
+
+/* ---------------- v2 engine: multi-factor selection, regime filter, risk-based sizing ---------------- */
+
+/** How much of the risk dial's exposure each strategy uses in each market regime. */
+const REGIME_EXPOSURE: Record<StratKey, Record<Regime["kind"], number>> = {
+  MOMENTUM: { up: 1, neutral: 0.8, chop: 0.5, down: 0.3, calm: 0.8 },
+  MEANREV: { up: 0.8, neutral: 1, chop: 1, down: 0.5, calm: 0.8 },
+  INDEX: { up: 1, neutral: 1, chop: 1, down: 0.75, calm: 1 },
+  PREIPO: { up: 1, neutral: 0.85, chop: 0.7, down: 0.4, calm: 0.85 },
+  SNIPER: { up: 1, neutral: 0.8, chop: 0.6, down: 0.25, calm: 0.7 },
+  BURNER: { up: 1, neutral: 0.85, chop: 0.7, down: 0.4, calm: 0.85 },
+};
+
+function rawTargetsV2(ag: AgentView, market: MarketAsset[], reg: Regime): TargetResult {
+  const U = market.filter((a) => ag.uni.includes(a.kind) && a.h.length >= MIN_HISTORY && last(a) > 0);
+  const E = ag.learn?.entry ?? 1;
+  const ex = exposure(ag.risk) * REGIME_EXPOSURE[ag.strat][reg.kind];
+  const held = (a: MarketAsset) => (ag.values[a.mint] ?? 0) > 1;
+  const tag = `[${reg.kind}]`;
+  if (!U.length) return { w: {}, note: "collecting price history for my universe, holding USDC", band: 0.03, warming: true };
+  const sized = (picks: MarketAsset[], total = ex) => scaleTo(invVol(picks), total);
+
+  switch (ag.strat) {
+    case "MOMENTUM": {
+      // blended score: 4h momentum (skip last 15m), 1h momentum, closeness to 8h high, lower volatility
+      const pool = U.filter((a) => a.h.length >= 120);
+      if (!pool.length) return { w: {}, note: "collecting price history for my universe, holding USDC", band: 0.08, warming: true };
+      const f1 = zs(pool.map((a) => momSkip(a.h, Math.min(240, a.h.length - 1), 15)));
+      const f2 = zs(pool.map((a) => retN(a.h, 60)));
+      const f3 = zs(pool.map((a) => fromHigh(a.h, 480)));
+      const f4 = zs(pool.map((a) => -vol(a.h, 120)));
+      const ranked = pool.map((a, i) => ({ a, s: 0.4 * f1[i] + 0.3 * f2[i] + 0.2 * f3[i] + 0.1 * f4[i] })).sort((x, y) => y.s - x.s);
+      const keep = ranked.filter(({ a }, i) => held(a) && i < 6 && retN(a.h, 120) > -0.006);
+      const fresh = reg.kind === "down" ? [] : ranked.filter(({ a }) => !held(a) && momSkip(a.h, Math.min(240, a.h.length - 1), 15) > 0.006 * E && retN(a.h, 60) > 0 && effRatio(a.h, 120) > 0.25);
+      const picks = dropCorrelated([...keep, ...fresh]).slice(0, 3).map((x) => x.a);
+      return { w: sized(picks), band: 0.08, note: picks.length ? `${tag} riding ${picks.map((a) => `${a.sym} ${pct(retN(a.h, 60))}`).join(", ")} over 60m` : `${tag} no clean trend, sitting in USDC` };
+    }
+    case "MEANREV": {
+      // only fade dips in assets that aren't in a clean downtrend and aren't collapsing
+      const z = U.map((a) => ({ a, z: devZ(a.h, 120) }));
+      const keep = z.filter(({ a, z }) => held(a) && z < 0);
+      const fresh = z.filter(({ a, z }) => !held(a) && z < -1.2 * E && effRatio(a.h, 60) < 0.35 && fromHigh(a.h, 480) > -0.15).sort((x, y) => x.z - y.z);
+      const picks = dropCorrelated([...keep, ...fresh]).slice(0, 3).map((x) => x.a);
+      const worst = z.slice().sort((x, y) => x.z - y.z)[0];
+      return { w: sized(picks), band: 0.08, note: fresh.length ? `${tag} ${fresh[0].a.sym} stretched ${fresh[0].z.toFixed(1)}σ below its 2h mean` : keep.length ? `${tag} holding ${keep.map((x) => x.a.sym).join(", ")} until they revert` : `${tag} nothing stretched; widest ${worst.a.sym} at ${worst.z.toFixed(1)}σ` };
+    }
+    case "INDEX": {
+      // half cap-weighted, half risk-parity across the basket
+      const basket = U.filter((a) => INDEX_WEIGHTS[a.sym]);
+      const B = basket.length ? basket : U;
+      const cap = scaleTo(Object.fromEntries(B.map((a) => [a.mint, INDEX_WEIGHTS[a.sym] ?? 1])), 1);
+      const rp = riskParity(B);
+      const raw: Record<string, number> = {};
+      B.forEach((a) => (raw[a.mint] = 0.5 * (cap[a.mint] ?? 0) + 0.5 * (rp[a.mint] ?? 0)));
+      return { w: scaleTo(raw, ex), band: 0.025, note: `${tag} basket of ${B.length}, cap + risk-parity weights, drift band ±2.5%` };
+    }
+    case "PREIPO": {
+      const pre = U.filter((a) => a.kind === "prestock");
+      const f1 = zs(pre.map((a) => retN(a.h, 240))), f2 = zs(pre.map((a) => fromHigh(a.h, 480)));
+      const ranked = pre.map((a, i) => ({ a, s: f1[i] + 0.5 * f2[i] })).sort((x, y) => y.s - x.s);
+      const picks = ranked.filter((x) => x.s > -0.5 || held(x.a)).slice(0, 4).map((x) => x.a);
+      const w = sized(picks, ex * (reg.kind === "up" ? 0.85 : 1));
+      if (reg.kind === "up") {
+        const preMints = new Set(market.filter((a) => a.kind === "prestock").map((a) => a.mint));
+        const coins = U.filter((a) => isLaunchCoin(a.kind) && a.quoteMint && preMints.has(a.quoteMint) && retN(a.h, 120) > 0).slice(0, 2);
+        Object.assign(w, scaleTo(Object.fromEntries(coins.map((a) => [a.mint, 1])), ex * 0.15));
+      }
+      const best = ranked[0];
+      return { w, band: 0.04, note: best ? `${tag} strongest pre-IPO over 4h: ${best.a.sym} ${pct(retN(best.a.h, 240))}` : "needs PreStocks in its universe" };
+    }
+    case "SNIPER": {
+      const pairs = U.filter((a) => isLaunchCoin(a.kind));
+      const w: Record<string, number> = {};
+      let exit = "";
+      const keep: MarketAsset[] = [];
+      for (const a of pairs) if (held(a)) {
+        const pnl = last(a) / (ag.entry[a.mint] || last(a)) - 1;
+        if (pnl > 0.18 * (ag.learn?.trail ?? 1) || pnl < -0.09 * (ag.learn?.stop ?? 1)) exit = `${a.sym} ${pnl > 0 ? "take-profit" : "stop-loss"} at ${pct(pnl)}`;
+        else keep.push(a);
+      }
+      // breakout = strong 15m move, still rising, at its 2h high, on a coin that isn't pure noise
+      const fresh = reg.kind === "down" ? [] : pairs.filter((a) => !held(a) && retN(a.h, 15) > 0.05 * E && retN(a.h, 3) > 0 && fromHigh(a.h, 120) > -0.01 && effRatio(a.h, 30) > 0.3)
+        .sort((x, y) => retN(y.h, 15) - retN(x.h, 15)).slice(0, Math.max(0, 2 - keep.length));
+      Object.assign(w, sized([...keep, ...fresh]));
+      const hottest = pairs.slice().sort((x, y) => retN(y.h, 15) - retN(x.h, 15))[0];
+      return { w, band: 0.05, note: exit || (hottest ? `${tag} scanning ${pairs.length} curves, hottest ${hottest.sym} ${pct(retN(hottest.h, 15))} 15m` : "needs stock-paired coins in its universe") };
+    }
+    case "BURNER": {
+      const raw: Record<string, number> = {};
+      if (U.some((a) => a.mint === STONK_MINT)) raw[STONK_MINT] = 0.5;
+      const coins = U.filter((a) => isLaunchCoin(a.kind));
+      const f1 = zs(coins.map((a) => retN(a.h, 240))), f2 = zs(coins.map((a) => fromHigh(a.h, 240)));
+      const top = reg.kind === "down" ? [] : coins.map((a, i) => ({ a, s: f1[i] + f2[i] })).filter((x) => retN(x.a.h, 240) > 0).sort((x, y) => y.s - x.s).slice(0, 2).map((x) => x.a);
+      const iv = invVol(top);
+      const ivs = Object.values(iv).reduce((x, y) => x + y, 0) || 1;
+      top.forEach((a) => (raw[a.mint] = 0.5 * (iv[a.mint] / ivs)));
+      return { w: scaleTo(raw, ex), band: 0.05, note: `${tag} stacking STONK${top.length ? `, farming ${top.map((a) => a.sym).join(", ")}` : ""}` };
+    }
+  }
 }

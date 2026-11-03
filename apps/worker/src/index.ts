@@ -5,6 +5,7 @@ import { market } from "./market";
 import { discoverPairs } from "./discovery";
 import { checkFunding, loadAgents, provision, refreshOnly, runLive, withdraw, type AgentRow } from "./agents";
 import { ensureSimAgents, resetSimsIfNeeded, runPaper } from "./paper";
+import { printSummary, runBacktests } from "./backtestJob";
 
 const busy = new Set<number>();
 // Exponential backoff per agent after an error, so a stuck agent doesn't spam retries.
@@ -81,8 +82,17 @@ async function discoveryLoop() {
   finally { discoveryRunning = false; }
 }
 
+let backtestRunning = false;
+async function backtestLoop() {
+  if (backtestRunning) return;
+  backtestRunning = true;
+  try { const s = await runBacktests(); if (s) printSummary(s); }
+  catch (e) { console.error("[backtest]", e); }
+  finally { backtestRunning = false; }
+}
+
 async function main() {
-  console.log(`stock-quant worker starting. trading=${env.tradingEnabled} withdrawals=${env.withdrawalsEnabled} jupiter=${env.jupiter.baseUrl}`);
+  console.log(`stonk-quant worker starting. engine real=${env.engine.real} sim=${env.engine.sim}. trading=${env.tradingEnabled} withdrawals=${env.withdrawalsEnabled} jupiter=${env.jupiter.baseUrl}`);
   await migrate();
   await resetSimsIfNeeded();
   await ensureSimAgents();
@@ -95,6 +105,9 @@ async function main() {
   setInterval(fastLoop, 10_000);
   setInterval(discoveryLoop, Math.max(30, env.discovery.intervalSec) * 1000);
   fastLoop();
+  // score v1 vs v2 on real history a few minutes after boot, then every few hours
+  setTimeout(backtestLoop, 3 * 60_000);
+  setInterval(backtestLoop, Math.max(1, env.backtestEveryHours) * 3600_000);
 }
 
 process.on("SIGTERM", async () => { console.log("shutting down"); await sql.end({ timeout: 5 }); process.exit(0); });

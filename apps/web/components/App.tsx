@@ -408,7 +408,7 @@ function Markets({ markets, agents, mint, setMint }: { markets: Market[]; agents
 
 /* ---------------- desk ---------------- */
 
-interface Detail { agent: Agent & { cadence_mul: number; uni: AssetKind[]; error: string | null; sim?: boolean; learn?: Learn | null }; events: { id: string; ts: string; type: string; text: string; sig: string | null }[]; equity: number[]; deposits: { sig: string; usdc: number; sol: number; ts: string }[] }
+interface Detail { agent: Agent & { cadence_mul: number; uni: AssetKind[]; error: string | null; sim?: boolean; learn?: Learn | null; engine?: string | null }; events: { id: string; ts: string; type: string; text: string; sig: string | null }[]; equity: number[]; deposits: { sig: string; usdc: number; sol: number; ts: string }[] }
 
 function Desk({ id, me, notify, onClose, onChanged }: { id: number; me: Me | null; notify: (m: string, e?: boolean) => void; onClose: () => void; onChanged: () => void }) {
   const [d, setD] = useState<Detail | null>(null);
@@ -475,7 +475,7 @@ function Desk({ id, me, notify, onClose, onChanged }: { id: number; me: Me | nul
               <h3 id="mName" style={{ color }}>{a.name} <span className={"pill " + pc} style={{ fontSize: 12, verticalAlign: "middle" }}>{label}</span></h3>
               <div className="muted">
                 {STRATS[a.strat]?.label} · {STRATS[a.strat]?.desc} Universe: {a.uni.map((k) => KIND_LABEL[k]).join(", ")}.
-                {a.address && <> Vault <a className="sig" href={acctUrl(a.address)} target="_blank" rel="noreferrer">{short(a.address)}</a>.</>} {a.sim ? "Paper trading." : <>Owner {short(a.owner)}.</>}
+                {a.address && <> Vault <a className="sig" href={acctUrl(a.address)} target="_blank" rel="noreferrer">{short(a.address)}</a>.</>} {a.sim ? "Paper trading." : <>Owner {short(a.owner)}.</>} Engine {a.engine === "v2" ? "v2 (multi-factor · market regime · risk-based sizing)" : "v1 (single-signal rules)"}.
               </div>
             </div>
             <button className="m-close" ref={closeRef} type="button" onClick={onClose}>Close [esc]</button>

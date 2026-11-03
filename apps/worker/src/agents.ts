@@ -166,7 +166,8 @@ export async function runLive(ag: AgentRow, minute: number) {
 
   const state = { ...ag.state, entry: { ...(ag.state.entry ?? {}) }, peak: { ...(ag.state.peak ?? {}) }, cooldown: { ...(ag.state.cooldown ?? {}) }, entryAt: { ...(ag.state.entryAt ?? {}) } };
   const peaksChanged = updatePeaks(state, s.values, (m) => market.price(m));
-  const view = { strat: ag.strat, risk: ag.risk, uni: ag.uni, values: s.values, cash: s.cash, entry: state.entry, peak: state.peak, cooldown: state.cooldown, entryAt: state.entryAt, learn: state.learn };
+  const view = { strat: ag.strat, risk: ag.risk, uni: ag.uni, values: s.values, cash: s.cash, entry: state.entry, peak: state.peak, cooldown: state.cooldown, entryAt: state.entryAt, learn: state.learn, engine: env.engine.real };
+  (state as any).engine = env.engine.real;
   // Stop-losses and trailing take-profits are checked every minute, not just at rebalance time.
   const due = !ag.last_rebalance_at || Date.now() - new Date(ag.last_rebalance_at).getTime() >= cadenceMinutes(ag) * 60_000 - 5_000 || needsRiskExit(view, market.view());
   if (!due) {

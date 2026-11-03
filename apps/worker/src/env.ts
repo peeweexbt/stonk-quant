@@ -44,6 +44,12 @@ export const env = {
   },
   otcBase: opt("OTC_BASE_URL", "https://otcdesks.cash"),
   // simulated paper-trading agents shown on the floor (0 = none; existing ones get retired)
+  /** strategy engine for real agents and for sims ("v1" original rules, "v2" multi-factor + regime + risk sizing) */
+  engine: {
+    real: (opt("REAL_ENGINE", "v1") === "v2" ? "v2" : "v1") as "v1" | "v2",
+    sim: (opt("SIM_ENGINE", "v2") === "v1" ? "v1" : "v2") as "v1" | "v2",
+  },
+  backtestEveryHours: Number(opt("BACKTEST_EVERY_HOURS", "6")),
   sim: {
     count: Number(opt("SIM_AGENTS", "6")),
     deposit: Number(opt("SIM_DEPOSIT_USD", "1000")),
