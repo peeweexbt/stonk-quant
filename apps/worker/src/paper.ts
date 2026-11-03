@@ -16,12 +16,13 @@ const SIM_NAMES: Record<StratKey, string> = {
 // Conservative presets: lower risk, patient rebalancing (fewer fees), liquid assets only.
 // Every rule here is available to real agents too (same risk dial, cadence and universe options).
 const SIM_PROFILE: Record<StratKey, { risk: number; cad: number; uni: AssetKind[] }> = {
-  MOMENTUM: { risk: 4, cad: 2.5, uni: ["xstock", "prestock", "stonk"] },
-  MEANREV: { risk: 4, cad: 2.5, uni: ["xstock", "prestock"] },
-  INDEX: { risk: 6, cad: 2.5, uni: ["xstock"] },
-  PREIPO: { risk: 4, cad: 2.5, uni: ["prestock"] },
-  SNIPER: { risk: 3, cad: 1, uni: ["pair"] },
-  BURNER: { risk: 3, cad: 2.5, uni: ["stonk", "pair"] },
+  // cad = cadence multiplier on the strategy's base rebalance interval (sims trade slowly on purpose)
+  MOMENTUM: { risk: 4, cad: 6, uni: ["xstock", "prestock", "stonk"] }, // every 90 min
+  MEANREV: { risk: 4, cad: 6, uni: ["xstock", "prestock"] }, // every 2 h
+  INDEX: { risk: 6, cad: 3, uni: ["xstock"] }, // every 12 h
+  PREIPO: { risk: 4, cad: 4, uni: ["prestock"] }, // every 4 h
+  SNIPER: { risk: 3, cad: 6, uni: ["pair"] }, // every 30 min
+  BURNER: { risk: 3, cad: 3, uni: ["stonk", "pair"] }, // every 6 h
 };
 
 /**
@@ -29,7 +30,7 @@ const SIM_PROFILE: Record<StratKey, { risk: number; cad: number; uni: AssetKind[
  * cash reset, positions/trades/volume/learning cleared, their log and equity history deleted.
  * Runs once per value (remembered in the settings table). Real agents are never touched.
  */
-const SIM_RESET_VERSION = "2026-11-03";
+const SIM_RESET_VERSION = "2026-11-04";
 
 export async function resetSimsIfNeeded() {
   const [row] = await sql<{ v: string }[]>`SELECT v FROM settings WHERE k = 'sim_reset'`;
