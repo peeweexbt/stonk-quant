@@ -90,7 +90,7 @@ export default function Landing() {
   return (
     <div className="landing">
       <header className="topbar l-top">
-        <a href="/" className="brand" style={{ textDecoration: "none" }}>STOCK<span>_QUANT</span></a>
+        <a href="/" className="brand" style={{ textDecoration: "none" }}>STONK<span>_QUANT</span></a>
         <nav className="nav" aria-label="Sections">
           <a href="#how">How it works</a><a href="#agents">Agents</a><a href="#universe">Universe</a><a href="#custody">Custody</a><a href="/docs">Docs</a><a href="/app">Floor</a>
         </nav>
