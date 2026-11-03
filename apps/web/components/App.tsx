@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ALL_KINDS, KIND_LABEL, LEARN_BOUNDS, LEARN_MIN, STRATS, STRAT_KEYS, isLaunchCoin, learnStats, type AssetKind, type Learn, type StratKey } from "@stonkquant/core";
+import { CaChip } from "./Ca";
 import { Sprite, spriteText, type Mood } from "./Sprite";
 import { asciiCandles, asciiSpark, figlet, sparkSvg } from "./chart";
 import { COLORS, acctUrl, cls, hhmm, pct, price, qty, short, txUrl, usd, usdShort } from "./format";
@@ -95,6 +96,7 @@ export default function App() {
         <a href="/" className="brand" style={{ textDecoration: "none" }}>STONK<span>_QUANT</span></a>
         <nav className="nav" aria-label="Sections"><a href="#floor">Agents</a><a href="#spawn">Spawn</a><a href="#markets">Markets</a><a href="/docs">Docs</a></nav>
         <div className="spacer" />
+        <CaChip compact />
         <div className="clock">{state ? <>LIVE <b className="num">{hhmm(state.now)}</b></> : "connecting…"}</div>
         <div className="wallet">
           {mine ? (

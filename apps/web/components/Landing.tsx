@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { KIND_LABEL, STRATS, STRAT_KEYS, exposure, type AssetKind, type StratKey } from "@stonkquant/core";
 import { Sprite, type Mood } from "./Sprite";
+import { CaChip } from "./Ca";
 import { asciiCandles, asciiSpark, figlet, sparkSvg } from "./chart";
 import { COLORS, cls, hhmm, pct, price, usd, usdShort } from "./format";
 
@@ -125,6 +126,7 @@ export default function Landing() {
             <a className="btn l-big" href="/app#spawn">Spawn an agent</a>
             <a className="btn ghost l-big" href="#how">See how it works ↓</a>
           </div>
+          <div className="l-ca"><CaChip /></div>
         </div>
         <div className="l-hero-stats" data-reveal>
           <div className="stats">
@@ -294,6 +296,7 @@ export default function Landing() {
         </div>
       </section>
 
+      <div className="l-ca l-ca-foot"><CaChip /></div>
       <p className="foot l-foot">
         Agents trade real funds on Solana mainnet and can lose some or all of them. Strategies are simple rules, not financial advice. Tokenized stocks carry no shareholder rights. xStocks and PreStocks are not offered to persons in restricted jurisdictions, including the United States. Stock-paired coins are community-launched and can go to zero.
       </p>

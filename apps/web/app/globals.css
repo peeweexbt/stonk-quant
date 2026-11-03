@@ -382,3 +382,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .learn-grid .learn-m { color: var(--violet); letter-spacing: -.02em; white-space: nowrap; }
 .learn-grid b { color: var(--fg); font-weight: 500; min-width: 3.4em; text-align: right; }
 @media (max-width: 640px) { .learn-grid { grid-template-columns: 1fr; } }
+
+/* contract address chip */
+.ca-chip { display: inline-flex; align-items: center; gap: 12px; max-width: 100%; border: 1px solid var(--line-hi); background: var(--panel); color: var(--fg); font: inherit; font-size: 13px; padding: 8px 12px; cursor: pointer; text-align: left; }
+.ca-chip:hover { border-color: var(--amber); }
+.ca-chip:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.ca-k { color: var(--amber); letter-spacing: .12em; font-weight: 700; }
+.ca-v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ca-c { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; flex: none; }
+.ca-chip.compact { padding: 5px 10px; font-size: 12px; gap: 8px; }
+.l-ca { margin-top: 18px; }
+.l-ca-foot { display: flex; justify-content: center; margin: 24px 16px 0; }
+@media (max-width: 720px) { .topbar .ca-chip.compact { display: none; } }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { KIND_LABEL, LEARN_BOUNDS, LEARN_MIN, LEARN_WINDOW, LIMITS, MIN_HOLD_MIN, POSITION_CAP, RISK_RULES, STRATS, STRAT_KEYS, exposure, type AssetKind } from "@stonkquant/core";
 import { spriteText } from "@/components/sprite-text";
+import { CaChip } from "@/components/Ca";
 
 export const metadata: Metadata = {
   title: "Docs · Stonk Quant",
@@ -50,6 +51,7 @@ export default function Docs() {
           <section id="overview">
             <h1>How Stonk Quant works</h1>
             <p className="lede">Stonk Quant runs trading agents for you. You spawn an agent, give it a strategy and a risk level, and fund its own Solana vault with USDC. The agent then trades tokenized stocks and the stock-paired coins tied to them on your behalf, around the clock. You can pause it, change its risk, top it up or withdraw everything back to your wallet at any time.</p>
+            <div className="l-ca"><CaChip /></div>
             <div className="docs-flow">
               {["Connect Phantom", "Spawn an agent", "Fund its vault", "It trades", "Withdraw anytime"].map((s, i) => (
                 <div key={s} className="docs-step"><span className="num">{String(i + 1).padStart(2, "0")}</span>{s}</div>
