@@ -1,7 +1,7 @@
 import type { AssetKind, MarketAsset } from "@stonkquant/core";
 import { sql } from "./db";
 import { getPrices } from "./jupiter";
-import { stonkfunPrices } from "./discovery";
+import { floatPrices, stonkfunPrices } from "./discovery";
 
 export interface AssetRow {
   mint: string;
@@ -49,6 +49,8 @@ class Market {
     const prices = await getPrices(list);
     const missing = list.filter((m) => !prices[m]).map((m) => this.assets.get(m)).filter((a): a is AssetRow => !!a && !!a.pool && a.kind === "pair");
     Object.assign(prices, await stonkfunPrices(missing.map((a) => ({ mint: a.mint, pool: a.pool! }))));
+    const missingFloat = list.filter((m) => !prices[m] && this.assets.get(m)?.kind === "float");
+    Object.assign(prices, await floatPrices(missingFloat));
     const ts = new Date(Math.floor(Date.now() / 60000) * 60000);
     const rows: { mint: string; ts: Date; price: number }[] = [];
     for (const m of list) {

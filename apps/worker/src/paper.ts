@@ -20,9 +20,9 @@ export const SIM_PROFILE: Record<StratKey, { risk: number; cad: number; uni: Ass
   MOMENTUM: { risk: 4, cad: 6, uni: ["xstock", "prestock", "stonk"] }, // every 90 min
   MEANREV: { risk: 4, cad: 6, uni: ["xstock", "prestock"] }, // every 2 h
   INDEX: { risk: 6, cad: 3, uni: ["xstock"] }, // every 12 h
-  PREIPO: { risk: 4, cad: 4, uni: ["prestock"] }, // every 4 h
-  SNIPER: { risk: 3, cad: 6, uni: ["pair"] }, // every 30 min
-  BURNER: { risk: 3, cad: 3, uni: ["stonk", "pair"] }, // every 6 h
+  PREIPO: { risk: 4, cad: 4, uni: ["prestock", "float"] }, // every 4 h
+  SNIPER: { risk: 3, cad: 6, uni: ["float"] }, // every 30 min
+  BURNER: { risk: 3, cad: 3, uni: ["stonk", "float"] }, // every 6 h
 };
 
 /**
@@ -30,7 +30,7 @@ export const SIM_PROFILE: Record<StratKey, { risk: number; cad: number; uni: Ass
  * cash reset, positions/trades/volume/learning cleared, their log and equity history deleted.
  * Runs once per value (remembered in the settings table). Real agents are never touched.
  */
-const SIM_RESET_VERSION = "2026-11-04-v2";
+const SIM_RESET_VERSION = "2026-11-06-float";
 
 export async function resetSimsIfNeeded() {
   const [row] = await sql<{ v: string }[]>`SELECT v FROM settings WHERE k = 'sim_reset'`;

@@ -32,17 +32,26 @@ export const env = {
     minVol24hUsd: Number(opt("DISCOVERY_MIN_VOL24H_USD", "5000")),
     max: Number(opt("DISCOVERY_MAX_PAIRS", "24")),
     intervalSec: Number(opt("DISCOVERY_INTERVAL_SEC", "60")),
-    pump: opt("DISCOVERY_PUMP", "true") === "true",
+    // Float (floatlaunch.xyz) coins paired with tokenized stocks: the main source
+    float: opt("DISCOVERY_FLOAT", "true") === "true",
+    floatMinMcapUsd: Number(opt("DISCOVERY_FLOAT_MIN_MCAP_USD", "30000")),
+    floatMinVol24hUsd: Number(opt("DISCOVERY_FLOAT_MIN_VOL24H_USD", "1000")),
+    floatMinLiqUsd: Number(opt("DISCOVERY_FLOAT_MIN_LIQ_USD", "5000")),
+    maxFloat: Number(opt("DISCOVERY_MAX_FLOAT", "24")),
+    // legacy sources, off by default
+    stonkfun: opt("DISCOVERY_STONKFUN", "false") === "true",
+    pump: opt("DISCOVERY_PUMP", "false") === "true",
     // pump.fun custom pairs and OTC coins are much smaller than stonk.fun pairs, so they get their own floors
     pumpMinMcapUsd: Number(opt("DISCOVERY_PUMP_MIN_MCAP_USD", "30000")),
     pumpMinVol24hUsd: Number(opt("DISCOVERY_PUMP_MIN_VOL24H_USD", "300")),
     otcMinMcapUsd: Number(opt("DISCOVERY_OTC_MIN_MCAP_USD", "30000")),
     otcMinVol24hUsd: Number(opt("DISCOVERY_OTC_MIN_VOL24H_USD", "5000")),
     maxPump: Number(opt("DISCOVERY_MAX_PUMP", "16")),
-    otc: opt("DISCOVERY_OTC", "true") === "true",
+    otc: opt("DISCOVERY_OTC", "false") === "true",
     maxOtc: Number(opt("DISCOVERY_MAX_OTC", "16")),
   },
   otcBase: opt("OTC_BASE_URL", "https://otcdesks.cash"),
+  floatBase: opt("FLOAT_BASE_URL", "https://www.floatlaunch.xyz"),
   // simulated paper-trading agents shown on the floor (0 = none; existing ones get retired)
   /** strategy engine for real agents and for sims ("v1" original rules, "v2" multi-factor + regime + risk sizing) */
   engine: {

@@ -27,10 +27,11 @@ const TOC: [string, string][] = [
 const KIND_DESC: Record<AssetKind, string> = {
   xstock: "Tokenized US stocks and ETFs issued by Backed (SPYx, QQQx, NVDAx, TSLAx…). Token-2022 tokens that track the underlying share price.",
   prestock: "Pre-IPO exposure tokens (OPENAI, ANTHROPIC, ANDURIL, POLYMARKET, KALSHI, NEURALINK). Thin, volatile, priced by their own markets.",
-  pair: "Coins launched on stonk.fun with an xStock or PreStock as their quote asset, so their price moves with both the coin and the stock.",
-  pump: "pump.fun custom-pair coins quoted in an xStock or PreStock, on the bonding curve or graduated to PumpSwap. Usually much smaller.",
-  otc: "Coins launched through otcdesks.cash that pay their holders rewards in xStocks or PreStocks. Only coins with a stock in their reward basket are included.",
-  stonk: "STONK, the stonk.fun platform token. Part of stonk.fun's fee buyback-and-burn.",
+  float: "Coins launched on Float (floatlaunch.xyz) with a tokenized stock or pre-IPO token as their quote asset, so their price moves with both the coin and the stock. Launched on Raydium LaunchLab; liquidity is locked on Raydium after graduation.",
+  pair: "Legacy: coins launched on stonk.fun with an xStock or PreStock as their quote asset, so their price moves with both the coin and the stock.",
+  pump: "Legacy: pump.fun custom-pair coins quoted in an xStock or PreStock, on the bonding curve or graduated to PumpSwap. Usually much smaller.",
+  otc: "Legacy: coins launched through otcdesks.cash that pay their holders rewards in xStocks or PreStocks. Only coins with a stock in their reward basket are included.",
+  stonk: "$FLOAT, Float's platform token. Part of Float's trading fees buy it back and burn it.",
 };
 
 export const revalidate = 300;
@@ -129,7 +130,7 @@ export default async function Docs() {
               </table>
             </div>
             <ul>
-              <li><b>Position caps:</b> no single asset can exceed {(["xstock", "prestock", "stonk", "pair", "pump", "otc"] as AssetKind[]).map((k) => `${Math.round(POSITION_CAP[k] * 100)}% (${KIND_LABEL[k]})`).join(", ")} of the vault.</li>
+              <li><b>Position caps:</b> no single asset can exceed {(["xstock", "prestock", "stonk", "float"] as AssetKind[]).map((k) => `${Math.round(POSITION_CAP[k] * 100)}% (${KIND_LABEL[k]})`).join(", ")} of the vault.</li>
               <li><b>Rebalance speed:</b> <em>Fast</em> checks twice as often as normal, <em>Patient</em> 2.5× less often (fewer trades, lower fees).</li>
               <li><b>Drift bands:</b> agents only trade when a position is meaningfully off target, so they don't churn on tiny moves. Trades under ${LIMITS.minTradeUsd} are skipped.</li>
               <li><b>Stop-losses:</b> checked every minute. A position is closed if it falls {(["xstock", "prestock", "stonk", "pair"] as AssetKind[]).map((k) => `${Math.round(RISK_RULES[k].stop * 100)}% (${k === "pair" ? "stock-paired coins" : KIND_LABEL[k]})`).join(", ")} below its entry, then the asset is benched for 6 hours.</li>
@@ -181,25 +182,25 @@ export default async function Docs() {
 
           <section id="universe">
             <h2>What agents can trade</h2>
-            <p>When you spawn an agent you choose which of these it may touch. Stock-paired coins are rescanned every minute.</p>
+            <p>When you spawn an agent you choose which of these it may touch. Float coins are rescanned every minute from Float's public coin list, and only coins paired with a tokenized stock or pre-IPO token are considered.</p>
             <div className="mkts-wrap">
               <table className="docs-table">
                 <thead><tr><th>Type</th><th>What it is</th></tr></thead>
                 <tbody>
-                  {(["xstock", "prestock", "pair", "pump", "otc", "stonk"] as AssetKind[]).map((k) => (
+                  {(["xstock", "prestock", "float", "stonk"] as AssetKind[]).map((k) => (
                     <tr key={k}><td><span className={"kind k-" + k}>{KIND_LABEL[k]}</span></td><td style={{ whiteSpace: "normal" }}>{KIND_DESC[k]}</td></tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p>A stock-paired coin only joins the universe if it clears a minimum market cap and 24h volume <b>and</b> a $10 test trade through Jupiter succeeds. Coins that fall below the bar are dropped from new trades.</p>
+            <p>A Float coin only joins the universe if it clears a minimum market cap, 24h volume and pool liquidity <b>and</b> a $10 test trade through Jupiter succeeds (in practice, mostly coins that have graduated from their launch curve). Coins that fall below the bar are dropped from new trades.</p>
           </section>
 
           <section id="fees">
             <h2>Fees &amp; limits</h2>
             <ul>
               <li><b>No Stonk Quant fee.</b> The platform doesn't take a cut of deposits, trades or profits.</li>
-              <li><b>Pool fees</b> are paid to the liquidity pools a trade routes through (for example 0.25% on stonk.fun's Raydium pools). They're included in every quote.</li>
+              <li><b>Pool fees</b> are paid to the liquidity pools a trade routes through (for example the fee on a Float coin's Raydium pool, part of which Float pays to that coin's holders). They're included in every quote.</li>
               <li><b>Network fees</b> come out of the agent's SOL balance. If it drops below {LIMITS.minGasSol} SOL the agent pauses itself until you top up.</li>
               <li><b>Slippage limits:</b> {LIMITS.slippageBpsStock / 100}% on stocks, {LIMITS.slippageBpsPair / 100}% on stock-paired coins. Any trade whose price impact is above {LIMITS.maxPriceImpactPct}% is skipped.</li>
               <li><b>Beta caps:</b> ${LIMITS.maxDepositUsd} per agent, {LIMITS.maxAgentsPerWallet} agents per wallet, at most {LIMITS.maxOrdersPerRebalance} trades per rebalance.</li>
@@ -231,7 +232,7 @@ export default async function Docs() {
 
           <section id="risks">
             <h2>Risks &amp; regions</h2>
-            <div className="banner">Agents trade real funds on Solana mainnet and can lose some or all of them. Strategies are simple rules, not financial advice. Stock-paired coins are community-launched and can go to zero quickly. Smart contracts, issuers, routers and key-management services can fail.</div>
+            <div className="banner">Agents trade real funds on Solana mainnet and can lose some or all of them. Strategies are simple rules, not financial advice. Float coins are community-launched and can go to zero quickly. Smart contracts, issuers, routers and key-management services can fail.</div>
             <p>xStocks and PreStocks are not offered to persons in restricted jurisdictions, including the United States. Spawning and deposits are blocked from restricted regions. You're responsible for following the rules where you live.</p>
           </section>
         </main>

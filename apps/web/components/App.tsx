@@ -23,7 +23,7 @@ interface State { now: string; markets: Market[]; agents: Agent[]; feed: FeedIte
 interface Me { wallet: string | null; restricted: { country: string; message: string } | null; limits: { gasSol: number; minDepositUsd: number; maxDepositUsd: number; maxAgents: number } }
 
 const SPY = "XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W";
-const UNI_LABEL: Record<AssetKind, string> = { xstock: "xStocks", prestock: "PreStocks", pair: "stonk.fun pairs", pump: "pump.fun pairs", otc: "OTC desk coins", stonk: "STONK" };
+const UNI_LABEL: Record<AssetKind, string> = { xstock: "xStocks", prestock: "PreStocks", float: "Float coins", pair: "stonk.fun pairs", pump: "pump.fun pairs", otc: "OTC desk coins", stonk: "$FLOAT" };
 const STATUS_PILL: Record<string, [string, string]> = {
   provisioning: ["boot", "creating vault"], awaiting_deposit: ["wait", "needs deposit"], live: ["live", "live"],
   paused: ["paused", "paused"], withdrawing: ["wait", "withdrawing"], retired: ["out", "retired"],
@@ -117,7 +117,7 @@ export default function App() {
       <section className="hero">
         <div className="hero-left">
           <pre className="logo" aria-label="Stonk Quant">{figlet("STONK")}{"\n"}<span className="q">{figlet("QUANT")}</span></pre>
-          <p className="pitch">Spawn an agent, fund its vault, and it trades <em>tokenized stocks</em> and <em>stock-paired coins</em> from stonk.fun, pump.fun and OTC desks on Solana for you. Every agent has its own strategy, wallet and risk dial, and you can withdraw any time.</p>
+          <p className="pitch">Spawn an agent, fund its vault, and it trades <em>tokenized stocks</em> and <em>the Float coins</em> launched on top of them, on Solana, for you. Every agent has its own strategy, wallet and risk dial, and you can withdraw any time.</p>
           <div className="stats">
             <Stat k="Assets under agents" v={state ? usdShort(state.stats.aum) : "—"} />
             <Stat k="Net P&L" v={state ? (state.stats.pnl >= 0 ? "+" : "") + usd(state.stats.pnl, 0) : "—"} cls={state ? cls(state.stats.pnl) : ""} />
@@ -143,7 +143,7 @@ export default function App() {
       <p className="foot">
         Agents trade real funds on Solana mainnet through Jupiter routes, from vaults whose keys are held by Turnkey and locked by policy to swaps and to withdrawals back to your wallet.
         Strategies are simple rules, not advice, and can lose money. Holding a tokenized stock or a stock-paired coin carries no shareholder rights. xStocks and PreStocks are not offered to persons in restricted jurisdictions, including the United States.
-        Stock-paired coins (stonk.fun, pump.fun, OTC desks) are community-launched and can go to zero. <a className="sig" href="/docs">Read the docs</a>.
+        Float coins are community-launched and can go to zero. <a className="sig" href="/docs">Read the docs</a>.
       </p>
 
       {openId !== null && <Desk id={openId} me={me} notify={notify} onClose={closeDesk} onChanged={loadState} />}
@@ -182,7 +182,7 @@ function ChartPanel({ markets, agents, mint, setMint }: { markets: Market[]; age
   }, [mint]);
   const m = markets.find((x) => x.mint === mint);
   const tabs = useMemo(() => {
-    const pick = ["SPYx", "NVDAx", "OPENAI", "STONK"].map((s) => markets.find((x) => x.sym === s)).filter(Boolean) as Market[];
+    const pick = ["SPYx", "NVDAx", "OPENAI", "FLOAT"].map((s) => markets.find((x) => x.sym === s)).filter(Boolean) as Market[];
     const topPair = markets.find((x) => isLaunchCoin(x.kind));
     const list = topPair ? [...pick, topPair] : pick;
     if (m && !list.some((x) => x.mint === m.mint)) list.push(m);
@@ -379,7 +379,7 @@ function Markets({ markets, agents, mint, setMint }: { markets: Market[]; agents
       <span className="tag-r">click a row to chart it</span>
       <div className="sec-head">
         <h2 className="sec-title">Stock universe</h2>
-        <span className="muted">Tokenized stocks plus the most liquid coins tied to them: stonk.fun pairs, pump.fun custom pairs and OTC desk coins that pay holders in stocks.</span>
+        <span className="muted">Tokenized stocks and pre-IPO tokens, plus the most liquid Float coins launched on top of them.</span>
       </div>
       <div className="mkts-wrap">
         <table>

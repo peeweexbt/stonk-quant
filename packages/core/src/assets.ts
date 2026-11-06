@@ -1,13 +1,17 @@
-// Curated stonk.fun quote assets. Mints come from stonk.fun's own quote-token list.
-// Stock-paired coins (stonk.fun pairs, pump.fun custom pairs, OTC desk stock-reward coins) are discovered
-// at runtime by the worker (see apps/worker/src/discovery.ts).
+// Curated base assets: tokenized stocks (xStocks), pre-IPO tokens (PreStocks) and the platform token ($FLOAT).
+// Float coins (launched on floatlaunch.xyz and paired with a tokenized stock) are discovered at runtime
+// by the worker (see apps/worker/src/discovery.ts).
+//
+// Kinds: "float" = Float stock-paired coins. "stonk" is the platform-token slot (now $FLOAT).
+// "pair" | "pump" | "otc" are legacy sources (stonk.fun, pump.fun, OTC desks), off by default.
 
-export type AssetKind = "xstock" | "prestock" | "pair" | "pump" | "otc" | "stonk";
+export type AssetKind = "xstock" | "prestock" | "float" | "pair" | "pump" | "otc" | "stonk";
 
-/** Coins tied to stocks: stonk.fun pairs, pump.fun custom pairs, OTC desk reward coins. */
-export const LAUNCH_KINDS: AssetKind[] = ["pair", "pump", "otc"];
-export const isLaunchCoin = (k: AssetKind) => k === "pair" || k === "pump" || k === "otc";
-export const ALL_KINDS: AssetKind[] = ["xstock", "prestock", "pair", "pump", "otc", "stonk"];
+/** Coins launched on top of stocks. */
+export const LAUNCH_KINDS: AssetKind[] = ["float", "pair", "pump", "otc"];
+export const isLaunchCoin = (k: AssetKind) => k === "float" || k === "pair" || k === "pump" || k === "otc";
+/** Kinds a new agent can be given. */
+export const ALL_KINDS: AssetKind[] = ["xstock", "prestock", "float", "stonk"];
 
 export interface AssetDef {
   mint: string;
@@ -21,7 +25,12 @@ export interface AssetDef {
 
 export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 export const USDC_DECIMALS = 6;
+/** Legacy stonk.fun token, no longer in the universe. */
 export const STONK_MINT = "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx";
+/** $FLOAT, Float's flagship token (trading fees buy it back and burn it). */
+export const FLOAT_MINT = "Bv1a7cEj5aRnJQhMw4kRQqAFesMSd5LwcDnUzq52BMmr";
+/** The platform token agents can hold (the "stonk" kind slot). */
+export const PLATFORM_MINT = FLOAT_MINT;
 
 export const CURATED_ASSETS: AssetDef[] = [
   // xStocks (Backed Finance, Token-2022, 8 decimals)
@@ -50,16 +59,17 @@ export const CURATED_ASSETS: AssetDef[] = [
   { mint: "PreLWGkkeqG1s4HEfFZSy9moCrJ7btsHuUtfcCeoRua", sym: "KALSHI", name: "Kalshi pre-IPO", kind: "prestock", decimals: 9 },
   { mint: "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S", sym: "NEURALINK", name: "Neuralink pre-IPO", kind: "prestock", decimals: 9 },
   // Platform token
-  { mint: STONK_MINT, sym: "STONK", name: "stonk.fun platform token", kind: "stonk", decimals: 9 },
+  { mint: FLOAT_MINT, sym: "FLOAT", name: "Float platform token", kind: "stonk", decimals: 6 },
 ];
 
 export const KIND_LABEL: Record<AssetKind, string> = {
   xstock: "xStock",
   prestock: "PreStock",
+  float: "Float coin",
   pair: "stonk.fun pair",
   pump: "pump.fun pair",
   otc: "OTC desk coin",
-  stonk: "platform",
+  stonk: "$FLOAT",
 };
 
 // Cap-weighted-ish basket for the Index Hugger, by symbol.

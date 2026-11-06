@@ -1,10 +1,10 @@
 # Stonk Quant
 
-Agent-run trading on Solana. Users connect Phantom, spawn an ASCII agent with a strategy and risk dial, fund its own vault with USDC + a little SOL, and the agent trades tokenized stocks (xStocks), pre-IPO tokens (PreStocks), STONK and the liquid stock-paired coins tied to them: stonk.fun pairs, pump.fun custom pairs, and OTC desk coins that pay holders in stocks. Owners can pause, change risk, top up, or withdraw everything back to their wallet at any time.
+Agent-run trading on Solana. Users connect Phantom, spawn an ASCII agent with a strategy and risk dial, fund its own vault with USDC + a little SOL, and the agent trades tokenized stocks (xStocks), pre-IPO tokens (PreStocks), $FLOAT and the liquid Float coins launched on top of them (floatlaunch.xyz). Owners can pause, change risk, top up, or withdraw everything back to their wallet at any time.
 
 ```
 apps/web      Next.js 14 site + API (Vercel)       Phantom sign-in, spawn, deposits, desk, live floor
-apps/worker   Node worker (Railway)                prices, stonk.fun discovery, Turnkey vaults, Jupiter trades, withdrawals
+apps/worker   Node worker (Railway)                prices, Float coin discovery, Turnkey vaults, Jupiter trades, withdrawals
 packages/core shared                               asset list (real mints), strategies, schema, limits
 ```
 
@@ -13,7 +13,7 @@ packages/core shared                               asset list (real mints), stra
 1. **Spawn**: the web API inserts an agent row (`provisioning`). The web app never holds keys.
 2. **Vault**: the worker creates one Turnkey wallet per agent (`awaiting_deposit`).
 3. **Deposit**: the owner signs a Phantom transaction sending USDC + SOL straight to the vault. The API reads it on-chain and records the USDC as the P&L baseline. The worker sees the balance and flips the agent `live`.
-4. **Trading**: every minute the worker stores prices (Jupiter Price API, stonk.fun fallback), and each due agent computes target weights → orders → Jupiter quote → swap tx → signed by Turnkey → sent and confirmed. USDC is the hub asset.
+4. **Trading**: every minute the worker stores prices (Jupiter Price API, Float API fallback), and each due agent computes target weights → orders → Jupiter quote → swap tx → signed by Turnkey → sent and confirmed. USDC is the hub asset.
 5. **Withdraw**: owner clicks Withdraw → worker sells to USDC, creates a one-off Turnkey policy that only allows transfers from *that* wallet to the owner, sends USDC (and anything unsellable), closes token accounts, sweeps SOL. Agent becomes `retired`.
 
 ## Key custody (Turnkey)
@@ -73,18 +73,18 @@ Keep the worker at **one replica**. Two workers would double-trade.
 | Strategy | Universe | Rule | Rebalance |
 | --- | --- | --- | --- |
 | Momentum Monk | all | top 3 positive 60-min trends, weighted by return | 15 min |
-| Reversion Goblin | stocks, STONK | buys assets >0.6σ below their 2h mean | 20 min |
+| Reversion Goblin | stocks | buys assets >0.6σ below their 2h mean | 20 min |
 | Index Hugger | xStocks | fixed SPY/QQQ-heavy basket | 4 h |
 | Pre-IPO Prophet | PreStocks + their pairs | tilts toward 4h strength | 1 h |
-| Pair Sniper | stonk.fun pairs | 15-min breakouts, +18% TP / −9% SL | 5 min |
-| Flywheel Farmer | STONK + pairs | 50% STONK, rest in top 4h pairs | 2 h |
+| Pair Sniper | Float coins | 15-min breakouts, +18% TP / −9% SL | 5 min |
+| Flywheel Farmer | $FLOAT + Float coins | 50% $FLOAT, rest in top 4h Float coins | 2 h |
 
-Risk dial sets total exposure (37%–100%); per-position caps: xStock 50%, PreStock/STONK 40%, pair coin 20%. Fast/Patient multiplies the cadence.
+Risk dial sets total exposure (37%–100%); per-position caps: xStock 50%, PreStock/$FLOAT 40%, Float coin 15%. Fast/Patient multiplies the cadence.
 
 ## Things to know
 
 - **Regulation**: xStocks and PreStocks aren't offered to US persons and several other regions. The geofence (`BLOCKED_COUNTRIES`, Vercel IP country) blocks spawning and deposits, but IP checks are easy to bypass. Running automated trading of tokenized securities with other people's funds may need licenses where you operate. Get legal advice before a public launch.
-- **Coin discovery** (every minute, `DISCOVERY_INTERVAL_SEC`): stonk.fun via its site API (`/api/v2/platform-pools`), pump.fun custom pairs via DexScreener (`/token-pairs/v1/solana/<stock mint>`, dexId `pumpfun`/`pumpswap`), OTC desk coins via `otcdesks.cash/api/coins` (only those whose reward basket includes xStocks/PreStocks). Every candidate must pass the mcap/volume floor and a $10 Jupiter test route before agents can trade it. None of these APIs are documented, so they can change; the curated stocks keep working without them.
+- **Coin discovery** (every minute, `DISCOVERY_INTERVAL_SEC`): Float coins from `https://www.floatlaunch.xyz/api/coins` (+ `/api/indexer/coins/stats` for 24h volume), kept only if quoted in an xStock/PreStock, above the mcap/volume/liquidity floors, and routable with a $10 Jupiter test quote. Legacy stonk.fun / pump.fun / OTC sources are off by default (`DISCOVERY_STONKFUN`, `DISCOVERY_PUMP`, `DISCOVERY_OTC`).
 - **xStocks are Token-2022** (8 decimals). Balances use the RPC's UI amounts, which include any scaled-UI multiplier.
 - **Deposits sent outside the app** still work: after a minute the vault balance becomes the P&L baseline.
 - **Priority fees** are capped by `JUPITER_MAX_PRIORITY_LAMPORTS`. Each agent needs SOL; at <0.006 SOL it pauses itself.

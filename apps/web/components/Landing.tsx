@@ -12,14 +12,15 @@ interface FeedItem { id: string; ts: string; type: string; text: string; name: s
 interface State { markets: Market[]; agents: Agent[]; feed: FeedItem[]; stats: { live: number; active: number; sims?: number; aum: number; trades: number; volume: number; assets: number } }
 
 const SPY = "XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W";
-const KIND_ORDER: AssetKind[] = ["xstock", "prestock", "pair", "pump", "otc", "stonk"];
+const KIND_ORDER: AssetKind[] = ["xstock", "prestock", "float", "stonk"];
 const KIND_BLURB: Record<AssetKind, string> = {
   xstock: "Tokenized US stocks & ETFs",
   prestock: "Pre-IPO exposure tokens",
+  float: "Float coins launched on stocks",
   pair: "stonk.fun coins quoted in stocks",
   pump: "pump.fun custom stock pairs",
   otc: "OTC coins that pay in stocks",
-  stonk: "stonk.fun platform token",
+  stonk: "Float's platform token",
 };
 
 /** Adds .in to [data-reveal] elements as they scroll into view. Content stays visible without JS. */
@@ -119,7 +120,7 @@ export default function Landing() {
           <Typer lines={[
             "> spawning agent… ok",
             "> vault created · keys sealed in Turnkey",
-            "> scanning xStocks, PreStocks, stonk.fun, pump.fun, OTC…",
+            "> scanning xStocks, PreStocks and Float coins…",
             "> agent online. trading tokenized stocks for you.",
           ]} />
           <div className="l-cta">

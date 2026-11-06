@@ -9,10 +9,12 @@ import { getQuote } from "./jupiter";
  *   pair  – stonk.fun coins launched against xStocks / PreStocks
  *   pump  – pump.fun "custom pairs" coins quoted in xStocks / PreStocks (bonding curve or PumpSwap)
  *   otc   – otcdesks.cash coins whose holder rewards are paid in xStocks / PreStocks
+ *   float – floatlaunch.xyz coins launched on Raydium LaunchLab against a tokenized stock (main source)
+ * stonk.fun, pump.fun and OTC are legacy and off by default (DISCOVERY_STONKFUN / _PUMP / _OTC).
  */
 
 interface Candidate {
-  kind: Extract<AssetKind, "pair" | "pump" | "otc">;
+  kind: Extract<AssetKind, "float" | "pair" | "pump" | "otc">;
   mint: string;
   sym: string;
   name: string;
@@ -31,6 +33,7 @@ const UA = { accept: "application/json", "user-agent": "stonk-quant-worker/0.2" 
 
 const cleanSym = (s: string) => s.replace(/[^\w$-]/g, "").slice(0, 12) || "COIN";
 const FLOORS: Record<Candidate["kind"], () => [number, number]> = {
+  float: () => [env.discovery.floatMinMcapUsd, env.discovery.floatMinVol24hUsd],
   pair: () => [env.discovery.minMcapUsd, env.discovery.minVol24hUsd],
   pump: () => [env.discovery.pumpMinMcapUsd, env.discovery.pumpMinVol24hUsd],
   otc: () => [env.discovery.otcMinMcapUsd, env.discovery.otcMinVol24hUsd],
@@ -45,6 +48,45 @@ async function getJson<T>(url: string, timeoutMs = 15_000): Promise<T> {
     if (!res.ok) throw new Error(`${new URL(url).host} ${res.status}`);
     return (await res.json()) as T;
   } finally { clearTimeout(t); }
+}
+
+/* ---------- Float (floatlaunch.xyz) ---------- */
+interface FloatCoin { coinMint: string; quoteMint: string; pool: string; name: string; ticker: string; status: string; price: number; fdvUsd: number; stockUsd: number; liquidityUsd: number }
+let floatCache: { at: number; coins: FloatCoin[] } | null = null;
+async function floatCoins(maxAgeMs = 50_000): Promise<FloatCoin[]> {
+  if (floatCache && Date.now() - floatCache.at < maxAgeMs) return floatCache.coins;
+  const coins = await getJson<FloatCoin[]>(`${env.floatBase}/api/coins`, 20_000);
+  floatCache = { at: Date.now(), coins: Array.isArray(coins) ? coins : [] };
+  return floatCache.coins;
+}
+/** Stock-paired quote: one of our curated xStocks/PreStocks, or any xStock/PreStock by their vanity mint prefixes. */
+const isStockQuote = (m: string) => stockSym.has(m) || m.startsWith("Xs") || m.startsWith("Pre");
+
+async function fromFloat(): Promise<Candidate[]> {
+  const [coins, stats] = await Promise.all([
+    floatCoins(0),
+    getJson<Record<string, { volume24h?: number; holders?: number }>>(`${env.floatBase}/api/indexer/coins/stats`, 20_000).catch(() => ({} as Record<string, { volume24h?: number }>)),
+  ]);
+  return coins
+    .filter((c) => c.coinMint && isStockQuote(c.quoteMint) && (c.liquidityUsd ?? 0) >= env.discovery.floatMinLiqUsd)
+    .map((c) => ({ kind: "float" as const, mint: c.coinMint, sym: cleanSym(c.ticker), name: c.name ?? c.ticker, quoteMint: c.quoteMint,
+      quoteSym: stockSym.get(c.quoteMint) ?? (c.quoteMint.startsWith("Pre") ? "PreStock" : "xStock"),
+      logo: null, pool: c.pool ?? null, mcap: c.fdvUsd ?? 0, vol: stats[c.coinMint]?.volume24h ?? 0 }));
+}
+
+/** Fallback USD prices from Float's own API (coin price in its quote × the quote's USD price). */
+export async function floatPrices(mints: string[]): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  if (!mints.length) return out;
+  try {
+    const want = new Set(mints);
+    for (const c of await floatCoins()) {
+      if (!want.has(c.coinMint)) continue;
+      const v = c.price * c.stockUsd;
+      if (v > 0 && Number.isFinite(v)) out[c.coinMint] = v;
+    }
+  } catch { /* best effort */ }
+  return out;
 }
 
 /* ---------- stonk.fun ---------- */
@@ -136,7 +178,8 @@ async function upsert(c: Candidate) {
 }
 
 const SOURCES: { kind: Candidate["kind"]; enabled: () => boolean; max: () => number; fetch: () => Promise<Candidate[]> }[] = [
-  { kind: "pair", enabled: () => true, max: () => env.discovery.max, fetch: fromStonkfun },
+  { kind: "float", enabled: () => env.discovery.float, max: () => env.discovery.maxFloat, fetch: fromFloat },
+  { kind: "pair", enabled: () => env.discovery.stonkfun, max: () => env.discovery.max, fetch: fromStonkfun },
   { kind: "pump", enabled: () => env.discovery.pump, max: () => env.discovery.maxPump, fetch: fromPump },
   { kind: "otc", enabled: () => env.discovery.otc, max: () => env.discovery.maxOtc, fetch: fromOtc },
 ];

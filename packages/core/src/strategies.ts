@@ -1,4 +1,4 @@
-import { INDEX_WEIGHTS, STONK_MINT, isLaunchCoin, type AssetKind } from "./assets";
+import { INDEX_WEIGHTS, PLATFORM_MINT, isLaunchCoin, type AssetKind } from "./assets";
 import type { ExitWhy, Learn } from "./learn";
 import { devZ, dropCorrelated, effRatio, fromHigh, invVol, marketRegime, momSkip, retN, riskParity, scaleTo, vol, zs, type Regime } from "./quant";
 
@@ -13,12 +13,12 @@ export interface StratDef {
 }
 
 export const STRATS: Record<StratKey, StratDef> = {
-  MOMENTUM: { label: "Momentum Monk", hat: ["   .-^-.   "], cad: 15, uni: ["xstock", "prestock", "pair", "pump", "otc", "stonk"], desc: "Rides the three strongest 60-minute trends." },
+  MOMENTUM: { label: "Momentum Monk", hat: ["   .-^-.   "], cad: 15, uni: ["xstock", "prestock", "float", "stonk"], desc: "Rides the three strongest 60-minute trends." },
   MEANREV: { label: "Reversion Goblin", hat: ["   /\\ /\\   "], cad: 20, uni: ["xstock", "prestock", "stonk"], desc: "Buys stretched dips back toward the 2-hour mean." },
   INDEX: { label: "Index Hugger", hat: ["   ▄▄▄▄▄   "], cad: 240, uni: ["xstock"], desc: "Holds a cap-weighted xStock basket, rebalances lazily." },
-  PREIPO: { label: "Pre-IPO Prophet", hat: ["    /^\\    "], cad: 60, uni: ["prestock", "pair", "pump"], desc: "PreStocks plus the coins quoted in them." },
-  SNIPER: { label: "Pair Sniper", hat: ["  ==[+]==  "], cad: 5, uni: ["pair", "pump", "otc"], desc: "Hunts breakouts on stock-paired coins, quick exits." },
-  BURNER: { label: "Flywheel Farmer", hat: ["   ( ) )   ", "   ) ( (   "], cad: 120, uni: ["stonk", "pair", "otc"], desc: "Stacks STONK and the strongest reward-paying coins." },
+  PREIPO: { label: "Pre-IPO Prophet", hat: ["    /^\\    "], cad: 60, uni: ["prestock", "float"], desc: "PreStocks plus the Float coins launched on them." },
+  SNIPER: { label: "Pair Sniper", hat: ["  ==[+]==  "], cad: 5, uni: ["float"], desc: "Hunts breakouts on Float coins, quick exits." },
+  BURNER: { label: "Flywheel Farmer", hat: ["   ( ) )   ", "   ) ( (   "], cad: 120, uni: ["stonk", "float"], desc: "Stacks $FLOAT and the strongest Float coins." },
 };
 
 export const STRAT_KEYS = Object.keys(STRATS) as StratKey[];
@@ -67,6 +67,7 @@ export const RISK_RULES: Record<AssetKind, { stop: number; arm: number; trail: n
   xstock: { stop: 0.07, arm: 0.06, trail: 0.03 },
   prestock: { stop: 0.12, arm: 0.12, trail: 0.06 },
   stonk: { stop: 0.18, arm: 0.25, trail: 0.1 },
+  float: { stop: 0.25, arm: 0.4, trail: 0.15 },
   pair: { stop: 0.25, arm: 0.4, trail: 0.15 },
   pump: { stop: 0.25, arm: 0.4, trail: 0.15 },
   otc: { stop: 0.25, arm: 0.4, trail: 0.15 },
@@ -138,7 +139,7 @@ const pct = (x: number, dp = 1) => (x >= 0 ? "+" : "") + (x * 100).toFixed(dp) +
 export const MIN_HISTORY = 30;
 
 /** Per-position caps (fraction of equity) so no single coin dominates a vault. */
-export const POSITION_CAP: Record<AssetKind, number> = { xstock: 0.5, prestock: 0.4, stonk: 0.4, pair: 0.2, pump: 0.15, otc: 0.15 };
+export const POSITION_CAP: Record<AssetKind, number> = { xstock: 0.5, prestock: 0.4, stonk: 0.4, float: 0.15, pair: 0.2, pump: 0.15, otc: 0.15 };
 
 export function computeTargets(ag: AgentView, market: MarketAsset[]): TargetResult & { exits: RiskExit[] } {
   const now = ag.now ?? Date.now();
@@ -255,15 +256,15 @@ function rawTargets(ag: AgentView, market: MarketAsset[]): TargetResult {
       pairs.filter((a) => !raw[a.mint] && ret(a, 15) > 0.05 * E && ret(a, 3) > 0).sort((a, b) => ret(b, 15) - ret(a, 15)).slice(0, slots).forEach((a) => (raw[a.mint] = 1));
       norm(raw);
       const hottest = pairs.slice().sort((a, b) => ret(b, 15) - ret(a, 15))[0];
-      return { w, band: 0.05, note: exit || (hottest ? `scanning ${pairs.length} curves, hottest ${hottest.sym} ${pct(ret(hottest, 15))} 15m` : "needs stock-paired coins in its universe") };
+      return { w, band: 0.05, note: exit || (hottest ? `scanning ${pairs.length} curves, hottest ${hottest.sym} ${pct(ret(hottest, 15))} 15m` : "needs Float coins in its universe") };
     }
     case "BURNER": {
       const raw: Record<string, number> = {};
-      if (U.some((a) => a.mint === STONK_MINT)) raw[STONK_MINT] = 0.5;
+      if (U.some((a) => a.mint === PLATFORM_MINT)) raw[PLATFORM_MINT] = 0.5;
       const top = U.filter((a) => isLaunchCoin(a.kind)).sort((a, b) => ret(b, 240) - ret(a, 240)).slice(0, 2);
       top.forEach((a) => (raw[a.mint] = 0.25));
       norm(raw);
-      return { w, band: 0.05, note: `stacking STONK${top.length ? `, farming ${top.map((a) => a.sym).join(", ")}` : ""}` };
+      return { w, band: 0.05, note: `stacking FLOAT${top.length ? `, farming ${top.map((a) => a.sym).join(", ")}` : ""}` };
     }
   }
 }
@@ -390,18 +391,18 @@ function rawTargetsV2(ag: AgentView, market: MarketAsset[], reg: Regime): Target
         .sort((x, y) => retN(y.h, 15) - retN(x.h, 15)).slice(0, Math.max(0, 2 - keep.length));
       Object.assign(w, sized([...keep, ...fresh]));
       const hottest = pairs.slice().sort((x, y) => retN(y.h, 15) - retN(x.h, 15))[0];
-      return { w, band: 0.05, note: exit || (hottest ? `${tag} scanning ${pairs.length} curves, hottest ${hottest.sym} ${pct(retN(hottest.h, 15))} 15m` : "needs stock-paired coins in its universe") };
+      return { w, band: 0.05, note: exit || (hottest ? `${tag} scanning ${pairs.length} curves, hottest ${hottest.sym} ${pct(retN(hottest.h, 15))} 15m` : "needs Float coins in its universe") };
     }
     case "BURNER": {
       const raw: Record<string, number> = {};
-      if (U.some((a) => a.mint === STONK_MINT)) raw[STONK_MINT] = 0.5;
+      if (U.some((a) => a.mint === PLATFORM_MINT)) raw[PLATFORM_MINT] = 0.5;
       const coins = U.filter((a) => isLaunchCoin(a.kind));
       const f1 = zs(coins.map((a) => retN(a.h, 240))), f2 = zs(coins.map((a) => fromHigh(a.h, 240)));
       const top = reg.kind === "down" ? [] : coins.map((a, i) => ({ a, s: f1[i] + f2[i] })).filter((x) => retN(x.a.h, 240) > 0).sort((x, y) => y.s - x.s).slice(0, 2).map((x) => x.a);
       const iv = invVol(top);
       const ivs = Object.values(iv).reduce((x, y) => x + y, 0) || 1;
       top.forEach((a) => (raw[a.mint] = 0.5 * (iv[a.mint] / ivs)));
-      return { w: scaleTo(raw, ex), band: 0.05, note: `${tag} stacking STONK${top.length ? `, farming ${top.map((a) => a.sym).join(", ")}` : ""}` };
+      return { w: scaleTo(raw, ex), band: 0.05, note: `${tag} stacking FLOAT${top.length ? `, farming ${top.map((a) => a.sym).join(", ")}` : ""}` };
     }
   }
 }
