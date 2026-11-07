@@ -30,11 +30,11 @@ async function getState() {
     sql<any[]>`
       SELECT id, owner, name, strat, risk, color, status, address, deposited_usd, withdrawn_usd, equity_usd, cash_usd, sol_balance,
              holdings, note, trades, volume_usd, created_at, last_rebalance_at, sim
-      FROM agents WHERE status <> 'retired' AND NOT hidden AND NOT sim ORDER BY sim ASC, (status = 'live') DESC, equity_usd DESC, id DESC LIMIT 60`,
+      FROM agents WHERE status <> 'retired' AND NOT hidden ORDER BY sim ASC, (status = 'live') DESC, equity_usd DESC, id DESC LIMIT 60`,
     sql<any[]>`
       SELECT e.id, e.ts, e.type, e.text, e.sig, a.id AS agent_id, a.name, a.color, a.sim
       FROM agent_events e JOIN agents a ON a.id = e.agent_id
-      WHERE e.type <> 'think' AND NOT a.hidden AND NOT a.sim ORDER BY e.ts DESC LIMIT 60`,
+      WHERE e.type <> 'think' AND NOT a.hidden ORDER BY e.ts DESC LIMIT 60`,
     sql<any[]>`
       SELECT
         count(*) FILTER (WHERE status = 'live' AND NOT sim)::int AS live,

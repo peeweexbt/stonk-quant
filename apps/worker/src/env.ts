@@ -60,7 +60,7 @@ export const env = {
   },
   backtestEveryHours: Number(opt("BACKTEST_EVERY_HOURS", "6")),
   sim: {
-    count: Number(opt("SIM_AGENTS", "0")),
+    count: Number(opt("SIM_AGENTS", "6")),
     deposit: Number(opt("SIM_DEPOSIT_USD", "1000")),
   },
 };
