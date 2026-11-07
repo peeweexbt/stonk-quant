@@ -38,6 +38,9 @@ export const env = {
     floatMinVol24hUsd: Number(opt("DISCOVERY_FLOAT_MIN_VOL24H_USD", "1000")),
     floatMinLiqUsd: Number(opt("DISCOVERY_FLOAT_MIN_LIQ_USD", "5000")),
     maxFloat: Number(opt("DISCOVERY_MAX_FLOAT", "24")),
+    // new xStocks / PreStocks from Jupiter's verified list (hourly), above this pool liquidity
+    stocks: opt("DISCOVERY_STOCKS", "true") === "true",
+    stockMinLiqUsd: Number(opt("DISCOVERY_STOCK_MIN_LIQ_USD", "20000")),
     // legacy sources, off by default
     stonkfun: opt("DISCOVERY_STONKFUN", "false") === "true",
     pump: opt("DISCOVERY_PUMP", "false") === "true",
@@ -58,6 +61,8 @@ export const env = {
     real: (opt("REAL_ENGINE", "v1") === "v2" ? "v2" : "v1") as "v1" | "v2",
     sim: (opt("SIM_ENGINE", "v2") === "v1" ? "v1" : "v2") as "v1" | "v2",
   },
+  /** agent names to hide from public views, comma-separated (e.g. "TEAM-1,TEAM-2") */
+  hiddenAgents: opt("HIDDEN_AGENTS", "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
   backtestEveryHours: Number(opt("BACKTEST_EVERY_HOURS", "6")),
   sim: {
     count: Number(opt("SIM_AGENTS", "6")),

@@ -1,7 +1,7 @@
 import { CURATED_ASSETS, USDC_MINT, type AssetKind } from "@stonkquant/core";
 import { sql } from "./db";
 import { env } from "./env";
-import { getQuote } from "./jupiter";
+import { getQuote, verifiedTokens } from "./jupiter";
 
 /**
  * Finds coins tied to tokenized stocks and keeps the liquid, routable ones in the
@@ -230,4 +230,33 @@ export async function stonkfunPrices(pools: { mint: string; pool: string }[]): P
     }
   } catch { /* best effort */ }
   return out;
+}
+
+/* ---------- new tokenized stocks (xStocks / PreStocks) ---------- */
+/**
+ * Hourly: adds any verified xStock or PreStock on Jupiter with enough pool liquidity that isn't curated yet,
+ * and switches off auto-added ones whose liquidity falls below half the floor. Curated assets are never touched.
+ */
+let lastStockScan = 0;
+export async function discoverStocks(force = false): Promise<number | null> {
+  if (!env.discovery.stocks || (!force && Date.now() - lastStockScan < 3600_000)) return null;
+  lastStockScan = Date.now();
+  const floor = env.discovery.stockMinLiqUsd;
+  const tokens = (await verifiedTokens()).filter((t) => t.tags?.includes("xstocks") || t.tags?.includes("prestocks"));
+  let added = 0;
+  for (const t of tokens) {
+    if (curated.has(t.id)) continue;
+    const liq = t.liquidity ?? 0;
+    const kind: AssetKind = t.tags?.includes("prestocks") ? "prestock" : "xstock";
+    if (liq >= floor) {
+      await sql`
+        INSERT INTO assets (mint, sym, name, kind, decimals, active)
+        VALUES (${t.id}, ${cleanSym(t.symbol)}, ${t.name.slice(0, 60)}, ${kind}, ${t.decimals}, true)
+        ON CONFLICT (mint) DO UPDATE SET sym = EXCLUDED.sym, name = EXCLUDED.name, kind = EXCLUDED.kind, decimals = EXCLUDED.decimals, active = true, updated_at = now()`;
+      added++;
+    } else if (liq < floor / 2) {
+      await sql`UPDATE assets SET active = false, updated_at = now() WHERE mint = ${t.id} AND active`;
+    }
+  }
+  return added;
 }

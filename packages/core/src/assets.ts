@@ -51,6 +51,15 @@ export const CURATED_ASSETS: AssetDef[] = [
   { mint: "Xsf9mBktVB9BSU5kf4nHxPq5hCBJ2j2ui3ecFGxPRGc", sym: "GMEx", name: "GameStop", kind: "xstock", decimals: 8 },
   { mint: "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re", sym: "GLDx", name: "Gold tracker", kind: "xstock", decimals: 8 },
   { mint: "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8", sym: "SPCXx", name: "SpaceX", kind: "xstock", decimals: 8 },
+  { mint: "XsqE9cRRpzxcGKDXj1BJ7Xmg4GRhZoyY1KpmGSxAWT2", sym: "MCDx", name: "McDonald's", kind: "xstock", decimals: 8 },
+  { mint: "Xs6B6zawENwAbWVi7w92rjazLuAr5Az59qgWKcNb45x", sym: "BRK.Bx", name: "Berkshire Hathaway", kind: "xstock", decimals: 8 },
+  { mint: "XshPgPdXFRWB8tP1j82rebb2Q9rPgGX37RuqzohmArM", sym: "INTCx", name: "Intel", kind: "xstock", decimals: 8 },
+  { mint: "XsaBXg8dU5cPM6ehmVctMkVqoiRG2ZjMo1cyBJ3AykQ", sym: "KOx", name: "Coca-Cola", kind: "xstock", decimals: 8 },
+  { mint: "XsafvsGtzFqqHgTnA3aPC83EAMkacU5mcGtcSayhpVV", sym: "TSMx", name: "TSMC", kind: "xstock", decimals: 8 },
+  { mint: "XsgSaSvNSqLTtFuyWPBhK9196Xb9Bbdyjj4fH3cPJGo", sym: "AVGOx", name: "Broadcom", kind: "xstock", decimals: 8 },
+  { mint: "Xs78JED6PFZxWc2wCEPspZW9kL3Se5J7L5TChKgsidH", sym: "STRCx", name: "Strategy preferred (STRC)", kind: "xstock", decimals: 8 },
+  { mint: "Xs2yquAgsHByNzx68WJC55WHjHBvG9JsMB7CWjTLyPy", sym: "DFDVx", name: "DeFi Development Corp", kind: "xstock", decimals: 8 },
+  { mint: "XsjQP3iMAaQ3kQScQKthQpx9ALRbjKAjQtHg6TFomoc", sym: "TQQQx", name: "3x Nasdaq-100 (TQQQ)", kind: "xstock", decimals: 8 },
   // PreStocks (pre-IPO tokens, 9 decimals)
   { mint: "PreweJYECqtQwBtpxHL171nL2K6umo692gTm7Q3rpgF", sym: "OPENAI", name: "OpenAI pre-IPO", kind: "prestock", decimals: 9 },
   { mint: "Pren1FvFX6J3E4kXhJuCiAD5aDmGEb7qJRncwA8Lkhw", sym: "ANTHROPIC", name: "Anthropic pre-IPO", kind: "prestock", decimals: 9 },
@@ -58,6 +67,9 @@ export const CURATED_ASSETS: AssetDef[] = [
   { mint: "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP", sym: "POLYMARKET", name: "Polymarket pre-IPO", kind: "prestock", decimals: 9 },
   { mint: "PreLWGkkeqG1s4HEfFZSy9moCrJ7btsHuUtfcCeoRua", sym: "KALSHI", name: "Kalshi pre-IPO", kind: "prestock", decimals: 9 },
   { mint: "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S", sym: "NEURALINK", name: "Neuralink pre-IPO", kind: "prestock", decimals: 9 },
+  { mint: "PreZad18qfPtbxNpMtMuAuX2zVpvkEU8DnJx56faCWd", sym: "FIGUREAI", name: "Figure AI pre-IPO", kind: "prestock", decimals: 9 },
+  { mint: "PreANxuXjsy2pvisWWMNB6YaJNzr7681wJJr2rHsfTh", sym: "SPACEX", name: "SpaceX pre-IPO", kind: "prestock", decimals: 9 },
+  { mint: "Pre9atBqkocK1QngFy7Q7zvyQictEFpXdLi6bZ2qnYy", sym: "OURA", name: "Oura pre-IPO", kind: "prestock", decimals: 9 },
   // Platform token
   { mint: FLOAT_MINT, sym: "FLOAT", name: "Float platform token", kind: "stonk", decimals: 6 },
 ];

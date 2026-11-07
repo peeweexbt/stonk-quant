@@ -2,7 +2,7 @@ import { sql, logEvent } from "./db";
 import { env } from "./env";
 import { migrate } from "./migrate";
 import { market } from "./market";
-import { discoverPairs } from "./discovery";
+import { discoverPairs, discoverStocks } from "./discovery";
 import { checkFunding, loadAgents, provision, refreshOnly, runLive, withdraw, type AgentRow } from "./agents";
 import { ensureSimAgents, resetSimsIfNeeded, runPaper } from "./paper";
 import { printSummary, runBacktests } from "./backtestJob";
@@ -75,9 +75,11 @@ async function discoveryLoop() {
   if (discoveryRunning) return; // a slow pass shouldn't stack up behind the next one
   discoveryRunning = true;
   try {
+    const ns = await discoverStocks().catch((e) => { console.warn("[discovery:stocks]", (e as Error).message); return null; });
+    if (ns !== null) console.log(`[discovery] ${ns} extra tokenized stocks above the liquidity floor`);
     const n = await discoverPairs();
     await market.loadAssets();
-    console.log(`[discovery] stonk.fun ${n.pair ?? "-"} · pump.fun ${n.pump ?? "-"} · OTC ${n.otc ?? "-"} coins in universe`);
+    console.log(`[discovery] Float ${n.float ?? "-"} coins in universe`);
   } catch (e) { console.error("[discovery]", e); }
   finally { discoveryRunning = false; }
 }

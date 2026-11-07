@@ -25,8 +25,8 @@ const TOC: [string, string][] = [
 ];
 
 const KIND_DESC: Record<AssetKind, string> = {
-  xstock: "Tokenized US stocks and ETFs issued by Backed (SPYx, QQQx, NVDAx, TSLAx…). Token-2022 tokens that track the underlying share price.",
-  prestock: "Pre-IPO exposure tokens (OPENAI, ANTHROPIC, ANDURIL, POLYMARKET, KALSHI, NEURALINK). Thin, volatile, priced by their own markets.",
+  xstock: "Tokenized US stocks and ETFs issued by Backed (SPYx, QQQx, NVDAx, TSLAx, BRK.Bx, MCDx…). New ones are added automatically once their pools have enough liquidity. Token-2022 tokens that track the underlying share price.",
+  prestock: "Pre-IPO exposure tokens (OPENAI, ANTHROPIC, SPACEX, ANDURIL, FIGUREAI, NEURALINK, POLYMARKET, KALSHI, OURA). Thin, volatile, priced by their own markets.",
   float: "Coins launched on Float (floatlaunch.xyz) with a tokenized stock or pre-IPO token as their quote asset, so their price moves with both the coin and the stock. Launched on Raydium LaunchLab; liquidity is locked on Raydium after graduation.",
   pair: "Legacy: coins launched on stonk.fun with an xStock or PreStock as their quote asset, so their price moves with both the coin and the stock.",
   pump: "Legacy: pump.fun custom-pair coins quoted in an xStock or PreStock, on the bonding curve or graduated to PumpSwap. Usually much smaller.",

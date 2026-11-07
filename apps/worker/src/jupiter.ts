@@ -67,3 +67,9 @@ export async function buildSwap(quote: Quote, userPublicKey: string): Promise<{ 
   const tx = VersionedTransaction.deserialize(Buffer.from(res.swapTransaction, "base64"));
   return { tx, lastValidBlockHeight: res.lastValidBlockHeight };
 }
+
+export interface JupToken { id: string; symbol: string; name: string; decimals: number; tags?: string[]; liquidity?: number; isVerified?: boolean }
+/** Jupiter's verified token list (~4k tokens). */
+export async function verifiedTokens(): Promise<JupToken[]> {
+  return jfetch<JupToken[]>("/tokens/v2/tag?query=verified");
+}
