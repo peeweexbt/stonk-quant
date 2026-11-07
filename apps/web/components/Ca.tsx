@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-export const CA = "9vuEq31XegdjFEexZJzXwoxWNp1mcNHVwqZ2ELnycoN1";
+export const CA = "5uhjgW31K5DiwMEvetFD9Lqn261ZJSG73HW4UDcfLoat";
 
 /** Token contract address with one-click copy. `compact` shortens it for tight headers. */
 export function CaChip({ compact = false }: { compact?: boolean }) {
