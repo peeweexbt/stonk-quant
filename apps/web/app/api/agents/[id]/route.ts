@@ -16,9 +16,11 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const sql = db();
   const [agent] = await sql<any[]>`
     SELECT id, owner, name, strat, risk, cadence_mul, uni, color, status, address, deposited_usd, withdrawn_usd, equity_usd, cash_usd,
-           sol_balance, holdings, note, trades, volume_usd, error, created_at, last_rebalance_at, sim, state->'learn' AS learn, state->>'engine' AS engine
+           sol_balance, holdings, note, trades, volume_usd, error, created_at, last_rebalance_at, sim, state->'learn' AS learn, state->>'engine' AS engine, hidden
     FROM agents WHERE id = ${id}`;
   if (!agent) return fail("agent not found", 404);
+  // hidden agents are only visible to their owner
+  if (agent.hidden && (await sessionWallet()) !== agent.owner) return fail("agent not found", 404);
   const [events, equity, deposits] = await Promise.all([
     sql`SELECT id, ts, type, text, sig FROM agent_events WHERE agent_id = ${id} ORDER BY ts DESC LIMIT 120`,
     sql<{ ts: string; equity: number }[]>`SELECT ts, equity FROM agent_equity WHERE agent_id = ${id} AND ts > now() - interval '7 days' ORDER BY ts ASC`,

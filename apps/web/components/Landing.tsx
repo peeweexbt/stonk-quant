@@ -133,7 +133,7 @@ export default function Landing() {
           <div className="stats">
             <div className="stat"><div className="k">Assets under agents</div><div className="v num">{state ? <Counter value={state.stats.aum} format={usdShort} /> : "—"}</div></div>
             <div className="stat"><div className="k">Agents live</div><div className="v num">{state ? <Counter value={state.stats.live} format={(n) => String(Math.round(n))} /> : "—"}</div></div>
-            <div className="stat"><div className="k">Sim agents</div><div className="v num">{state ? <Counter value={state.stats.sims ?? 0} format={(n) => String(Math.round(n))} /> : "—"}</div></div>
+            <div className="stat"><div className="k">Trades</div><div className="v num">{state ? <Counter value={state.stats.trades} format={(n) => String(Math.round(n))} /> : "—"}</div></div>
             <div className="stat"><div className="k">Assets tracked</div><div className="v num" style={{ color: "var(--fire)" }}>{state ? <Counter value={state.stats.assets} format={(n) => String(Math.round(n))} /> : "—"}</div></div>
           </div>
           <div className="frame l-chart">
@@ -183,7 +183,7 @@ export default function Landing() {
       <section id="agents" className="l-section">
         <p className="l-eyebrow">Meet the agents</p>
         <h2 className="l-h2" data-reveal>Six temperaments. Pick one, or run them all.</h2>
-        <p className="l-lede" data-reveal>Each strategy is a simple, transparent rule. The SIM agents below paper-trade every strategy on live prices right now, so you can watch them before you fund one.</p>
+        <p className="l-lede" data-reveal>Each strategy is a simple, transparent rule, and every agent trades in public on the floor.</p>
         <div className="l-agents">
           {STRAT_KEYS.map((k, i) => {
             const s = STRATS[k];

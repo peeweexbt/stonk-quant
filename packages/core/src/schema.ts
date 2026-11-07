@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS agents (
 );
 CREATE INDEX IF NOT EXISTS agents_owner ON agents (owner);
 ALTER TABLE agents ADD COLUMN IF NOT EXISTS sim BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS agents_status ON agents (status);
 CREATE UNIQUE INDEX IF NOT EXISTS agents_live_name ON agents (upper(name)) WHERE status <> 'retired';
 
