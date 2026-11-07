@@ -22,6 +22,12 @@ interface FeedItem { id: string; ts: string; type: string; text: string; sig: st
 interface State { now: string; markets: Market[]; agents: Agent[]; feed: FeedItem[]; stats: { live: number; active: number; sims?: number; aum: number; pnl: number; trades: number; volume: number; assets: number } }
 interface Me { wallet: string | null; restricted: { country: string; message: string } | null; limits: { gasSol: number; minDepositUsd: number; maxDepositUsd: number; maxAgents: number } }
 
+interface Preset { strat: StratKey; risk: number; cad: number; uni: AssetKind[]; from: string; n: number }
+interface LbRow { id: number; name: string; strat: StratKey; risk: number; cadence: number; uni: AssetKind[]; color: number; sim: boolean; status: string; equity: number; ret: number | null; maxDD: number; trades: number; winRate: number | null; closed: number; since: string; spark: number[] }
+
+const CADENCES: [number, string][] = [[0.5, "Fast (2× as often)"], [1, "Normal"], [2.5, "Patient (2.5× slower)"], [3, "Slow (3×)"], [4, "Slower (4×)"], [6, "Very slow (6×, fewest fees)"]];
+const nearestCad = (c: number) => CADENCES.reduce((b, [v]) => (Math.abs(v - c) < Math.abs(b - c) ? v : b), 1);
+
 const SPY = "XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W";
 const UNI_LABEL: Record<AssetKind, string> = { xstock: "xStocks", prestock: "PreStocks", float: "Float coins", pair: "stonk.fun pairs", pump: "pump.fun pairs", otc: "OTC desk coins", stonk: "$FLOAT" };
 const STATUS_PILL: Record<string, [string, string]> = {
@@ -55,6 +61,7 @@ export default function App() {
   const [openId, setOpenId] = useState<number | null>(null);
   const [filter, setFilter] = useState<"ALL" | "MINE" | "REAL" | "SIM" | StratKey>("ALL");
   const [toast, setToast] = useState<{ msg: string; err?: boolean } | null>(null);
+  const [preset, setPreset] = useState<Preset | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const notify = useCallback((msg: string, err = false) => {
@@ -79,6 +86,11 @@ export default function App() {
   }, [loadState, loadMe]);
 
   const closeDesk = useCallback(() => { setOpenId(null); history.replaceState(null, "", location.pathname); }, []);
+  const copySettings = useCallback((p: Omit<Preset, "n">) => {
+    setOpenId(null);
+    setPreset({ ...p, n: Date.now() });
+    requestAnimationFrame(() => document.getElementById("spawn")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }, []);
 
   const doSignIn = async () => {
     try { await signIn(); await loadMe(); notify("Signed in"); }
@@ -94,13 +106,14 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <a href="/" className="brand" style={{ textDecoration: "none" }}>STOCK<span>_QUANT</span></a>
-        <nav className="nav" aria-label="Sections"><a href="#floor">Agents</a><a href="#spawn">Spawn</a><a href="#markets">Markets</a><a href="/docs">Docs</a></nav>
+        <nav className="nav" aria-label="Sections"><a href="#floor">Agents</a><a href="#leaderboard">Leaderboard</a><a href="#spawn">Spawn</a><a href="#markets">Markets</a><a href="/docs">Docs</a></nav>
         <div className="spacer" />
         <CaChip compact />
         <div className="clock">{state ? <>LIVE <b className="num">{hhmm(state.now)}</b></> : "connecting…"}</div>
         <div className="wallet">
           {mine ? (
             <>
+              <TelegramButton notify={notify} />
               <span className="bal num">{short(mine)}</span>
               <button className="btn ghost" type="button" onClick={doSignOut}>Sign out</button>
             </>
@@ -133,10 +146,12 @@ export default function App() {
       <div className="main">
         <Floor agents={agents} mine={mine} filter={filter} setFilter={setFilter} onOpen={setOpenId} loaded={!!state} />
         <aside className="side">
-          <Spawn me={me} onSignIn={doSignIn} notify={notify} onCreated={(id) => { setOpenId(id); loadState(); }} />
+          <Spawn me={me} preset={preset} onSignIn={doSignIn} notify={notify} onCreated={(id) => { setOpenId(id); loadState(); }} />
           <Feed feed={feed(state)} onOpen={setOpenId} />
         </aside>
       </div>
+
+      <Leaderboard onOpen={setOpenId} onCopy={copySettings} />
 
       <Markets markets={markets} agents={agents} mint={chartMint} setMint={setChartMint} />
 
@@ -146,7 +161,7 @@ export default function App() {
         Float coins are community-launched and can go to zero. <a className="sig" href="/docs">Read the docs</a>.
       </p>
 
-      {openId !== null && <Desk id={openId} me={me} notify={notify} onClose={closeDesk} onChanged={loadState} />}
+      {openId !== null && <Desk id={openId} me={me} notify={notify} onClose={closeDesk} onChanged={loadState} onCopy={copySettings} />}
       {toast && <div className={"toast" + (toast.err ? " err" : "")} role="status">{toast.msg}</div>}
     </div>
   );
@@ -262,7 +277,7 @@ function AgentCard({ a, mine, onOpen }: { a: Agent; mine: boolean; onOpen: () =>
 
 /* ---------------- spawn ---------------- */
 
-function Spawn({ me, onSignIn, notify, onCreated }: { me: Me | null; onSignIn: () => void; notify: (m: string, e?: boolean) => void; onCreated: (id: number) => void }) {
+function Spawn({ me, preset, onSignIn, notify, onCreated }: { me: Me | null; preset: Preset | null; onSignIn: () => void; notify: (m: string, e?: boolean) => void; onCreated: (id: number) => void }) {
   const [name, setName] = useState("");
   const [strat, setStrat] = useState<StratKey>("MOMENTUM");
   const [uni, setUni] = useState<AssetKind[]>(STRATS.MOMENTUM.uni);
@@ -273,6 +288,17 @@ function Spawn({ me, onSignIn, notify, onCreated }: { me: Me | null; onSignIn: (
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { setName(["GRIDLOCK", "BETA-MAX", "THETA", "DIP-9", "SHARPE", "KELLY", "VWAP-3", "ALPHA-7", "BAGWORK", "GAMMA"][Math.floor(Math.random() * 10)] + "-" + Math.floor(Math.random() * 90 + 10)); }, []);
+
+  // "Copy settings" from the leaderboard or an agent desk
+  useEffect(() => {
+    if (!preset) return;
+    setStrat(preset.strat);
+    const u = preset.uni.filter((k) => ALL_KINDS.includes(k));
+    setUni(u.length ? u : STRATS[preset.strat].uni);
+    setRisk(preset.risk);
+    setCad(String(nearestCad(preset.cad)));
+    notify(`Copied ${preset.from}'s settings. Pick a handle and spawn.`);
+  }, [preset, notify]);
 
   const pickStrat = (k: StratKey) => { setStrat(k); setUni(STRATS[k].uni); };
   const toggle = (k: AssetKind) => setUni((u) => (u.includes(k) ? u.filter((x) => x !== k) : [...u, k]));
@@ -327,9 +353,7 @@ function Spawn({ me, onSignIn, notify, onCreated }: { me: Me | null; onSignIn: (
         <div className="field">
           <label htmlFor="fCad">Rebalance speed</label>
           <select className="input" id="fCad" value={cad} onChange={(e) => setCad(e.target.value)}>
-            <option value="0.5">Fast (2× as often)</option>
-            <option value="1">Normal</option>
-            <option value="2.5">Patient (fewer trades, lower fees)</option>
+            {CADENCES.map(([v, l]) => <option key={v} value={String(v)}>{l}</option>)}
           </select>
         </div>
         <label className="terms" htmlFor="fTerms">
@@ -410,7 +434,7 @@ function Markets({ markets, agents, mint, setMint }: { markets: Market[]; agents
 
 interface Detail { agent: Agent & { cadence_mul: number; uni: AssetKind[]; error: string | null; sim?: boolean; learn?: Learn | null; engine?: string | null }; events: { id: string; ts: string; type: string; text: string; sig: string | null }[]; equity: number[]; deposits: { sig: string; usdc: number; sol: number; ts: string }[] }
 
-function Desk({ id, me, notify, onClose, onChanged }: { id: number; me: Me | null; notify: (m: string, e?: boolean) => void; onClose: () => void; onChanged: () => void }) {
+function Desk({ id, me, notify, onClose, onChanged, onCopy }: { id: number; me: Me | null; notify: (m: string, e?: boolean) => void; onClose: () => void; onChanged: () => void; onCopy: (p: Omit<Preset, "n">) => void }) {
   const [d, setD] = useState<Detail | null>(null);
   const [risk, setRisk] = useState<number | null>(null);
   const [armed, setArmed] = useState(false);
@@ -478,7 +502,10 @@ function Desk({ id, me, notify, onClose, onChanged }: { id: number; me: Me | nul
                 {a.address && <> Vault <a className="sig" href={acctUrl(a.address)} target="_blank" rel="noreferrer">{short(a.address)}</a>.</>} {a.sim ? "Paper trading." : <>Owner {short(a.owner)}.</>} Engine {a.engine === "v2" ? "v2 (multi-factor · market regime · risk-based sizing)" : "v1 (single-signal rules)"}.
               </div>
             </div>
-            <button className="m-close" ref={closeRef} type="button" onClick={onClose}>Close [esc]</button>
+            <div className="m-actions">
+              <button className="chip" type="button" onClick={() => onCopy({ strat: a.strat, risk: a.risk, cad: a.cadence_mul, uni: a.uni, from: a.name })}>⧉ Copy settings</button>
+              <button className="m-close" ref={closeRef} type="button" onClick={onClose}>Close [esc]</button>
+            </div>
           </div>
 
           <div className="m-grid">
@@ -619,5 +646,86 @@ function Learning({ L, strat }: { L: Learn | null; strat: string }) {
       </div>
       {L.last && <p className="note-sm" style={{ marginTop: 8 }}>Last adjustment{L.at ? ` ${hhmm(new Date(L.at).toISOString())}` : ""}: {L.last}</p>}
     </div>
+  );
+}
+
+/* ---------------- telegram alerts ---------------- */
+
+function TelegramButton({ notify }: { notify: (m: string, e?: boolean) => void }) {
+  const [st, setSt] = useState<{ enabled: boolean; linked?: boolean } | null>(null);
+  const load = useCallback(async () => { try { setSt(await api("/api/telegram")); } catch { /* ignore */ } }, []);
+  useEffect(() => { load(); }, [load]);
+  if (!st?.enabled) return null;
+  const connect = async () => {
+    try {
+      const { url } = await api<{ url: string }>("/api/telegram", { method: "POST" });
+      window.open(url, "_blank", "noopener");
+      notify("Opened Telegram. Press Start in the chat to finish connecting.");
+      // pick up the link once the user presses Start
+      let n = 0;
+      const t = setInterval(async () => { n++; const s = await api<{ enabled: boolean; linked?: boolean }>("/api/telegram").catch(() => null); if (s?.linked) { setSt(s); clearInterval(t); notify("Telegram alerts on"); } if (n > 60) clearInterval(t); }, 3000);
+    } catch (e) { notify((e as Error).message, true); }
+  };
+  const disconnect = async () => {
+    if (!confirm("Turn off Telegram alerts?")) return;
+    try { await api("/api/telegram", { method: "DELETE" }); setSt({ ...st, linked: false }); notify("Telegram alerts off"); }
+    catch (e) { notify((e as Error).message, true); }
+  };
+  return st.linked
+    ? <button className="chip tg on" type="button" onClick={disconnect} title="Telegram alerts are on. Click to turn off.">🔔 Alerts on</button>
+    : <button className="chip tg" type="button" onClick={connect} title="Get a Telegram message when your agents trade">🔔 Telegram alerts</button>;
+}
+
+/* ---------------- leaderboard ---------------- */
+
+function Leaderboard({ onOpen, onCopy }: { onOpen: (id: number) => void; onCopy: (p: Omit<Preset, "n">) => void }) {
+  const [win, setWin] = useState<"24h" | "7d" | "all">("7d");
+  const [kind, setKind] = useState<"ALL" | "REAL" | "SIM">("ALL");
+  const [rows, setRows] = useState<LbRow[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    const load = () => api<{ rows: LbRow[] }>(`/api/leaderboard?window=${win}`).then((d) => live && setRows(d.rows)).catch(() => live && setRows([]));
+    load();
+    const t = setInterval(load, 60_000);
+    return () => { live = false; clearInterval(t); };
+  }, [win]);
+  const shown = (rows ?? []).filter((r) => kind === "ALL" || (kind === "SIM" ? r.sim : !r.sim));
+  const age = (iso: string) => { const d = (Date.now() - new Date(iso).getTime()) / 86400_000; return d < 1 ? `${Math.max(1, Math.round(d * 24))}h` : `${Math.round(d)}d`; };
+  return (
+    <section className="frame lb" id="leaderboard">
+      <span className="tag">Leaderboard</span>
+      <div className="lb-bar">
+        <div className="filters" role="tablist" aria-label="Time window">
+          {(["24h", "7d", "all"] as const).map((w) => <button key={w} type="button" role="tab" aria-selected={win === w} className={"chip" + (win === w ? " on" : "")} onClick={() => setWin(w)}>{w === "all" ? "All time" : w}</button>)}
+        </div>
+        <div className="filters" role="tablist" aria-label="Agent type">
+          {(["ALL", "REAL", "SIM"] as const).map((k) => <button key={k} type="button" role="tab" aria-selected={kind === k} className={"chip" + (kind === k ? " on" : "")} onClick={() => setKind(k)}>{k === "ALL" ? "All" : k === "REAL" ? "Real" : "Sim"}</button>)}
+        </div>
+      </div>
+      <div className="mkts-wrap">
+        <table className="lb-table">
+          <thead><tr><th>#</th><th>Agent</th><th>Strategy</th><th className="r">Return</th><th className="r">Max drop</th><th className="r">Win rate</th><th className="r">Trades</th><th className="r">Age</th><th>Equity curve</th><th></th></tr></thead>
+          <tbody className="num">
+            {shown.map((r, i) => (
+              <tr key={r.id} onClick={() => onOpen(r.id)} style={{ cursor: "pointer" }}>
+                <td className="muted">{i + 1}</td>
+                <td><b style={{ color: COLORS[r.color % COLORS.length] }}>{r.name}</b>{r.sim && <span className="pill sim" style={{ marginLeft: 6, fontSize: 10 }}>sim</span>}</td>
+                <td className="muted">{STRATS[r.strat]?.label ?? r.strat} · risk {r.risk}</td>
+                <td className={"r " + (r.ret === null ? "muted" : cls(r.ret))}>{r.ret === null ? "—" : pct(r.ret, 2)}</td>
+                <td className="r">{r.maxDD > 0.0001 ? pct(-r.maxDD, 2) : "—"}</td>
+                <td className="r">{r.winRate === null ? <span className="muted">—</span> : `${Math.round(r.winRate * 100)}%`}</td>
+                <td className="r">{r.trades}</td>
+                <td className="r muted">{age(r.since)}</td>
+                <td><span dangerouslySetInnerHTML={{ __html: sparkSvg(r.spark, (r.ret ?? 0) >= 0 ? "var(--up)" : "var(--down)", 110, 22) }} /></td>
+                <td><button className="chip" type="button" onClick={(e) => { e.stopPropagation(); onCopy({ strat: r.strat, risk: r.risk, cad: r.cadence, uni: r.uni, from: r.name }); }}>⧉ Copy</button></td>
+              </tr>
+            ))}
+            {rows && !shown.length && <tr><td colSpan={10} className="muted">No agents here yet.</td></tr>}
+            {!rows && <tr><td colSpan={10} className="muted">Loading…</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <p className="note-sm">Return adjusts for deposits made during the window. Win rate is over each agent's recent closed trades. Past results don't predict future ones. "Copy" pre-fills the spawn form with that agent's strategy, risk, speed and universe.</p>
+    </section>
   );
 }

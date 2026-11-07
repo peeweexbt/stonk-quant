@@ -13,6 +13,12 @@ export const sql = postgres(env.databaseUrl, {
 
 export type EventType = "buy" | "sell" | "think" | "evt" | "err" | "boot" | "learn";
 
+type EventHook = (agentId: number, type: EventType, text: string, sig?: string | null) => Promise<void>;
+let eventHook: EventHook | null = null;
+/** Called after every logged event (used for Telegram alerts). Never blocks or throws into the caller. */
+export function setEventHook(h: EventHook) { eventHook = h; }
+
 export async function logEvent(agentId: number, type: EventType, text: string, sig?: string | null) {
   await sql`INSERT INTO agent_events (agent_id, type, text, sig) VALUES (${agentId}, ${type}, ${text.slice(0, 400)}, ${sig ?? null})`;
+  if (eventHook) eventHook(agentId, type, text, sig).catch(() => {});
 }

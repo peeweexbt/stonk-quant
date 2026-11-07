@@ -63,6 +63,10 @@ export const env = {
   },
   /** agent names to hide from public views, comma-separated (e.g. "TEAM-1,TEAM-2") */
   hiddenAgents: opt("HIDDEN_AGENTS", "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
+  telegram: {
+    token: opt("TELEGRAM_BOT_TOKEN", ""),
+  },
+  siteUrl: opt("SITE_URL", "https://www.stockquant.agency"),
   backtestEveryHours: Number(opt("BACKTEST_EVERY_HOURS", "6")),
   sim: {
     count: Number(opt("SIM_AGENTS", "6")),

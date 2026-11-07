@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   if (!(risk >= 1 && risk <= 10)) return fail("risk must be 1 to 10");
   const uni = Array.isArray(b.uni) ? [...new Set(b.uni.filter((k) => KINDS.includes(k)))] : [];
   if (!uni.length) return fail("allow at least one asset type");
-  const cad = [0.5, 1, 2.5].includes(Number(b.cadenceMul)) ? Number(b.cadenceMul) : 1;
+  const cad = [0.5, 1, 2.5, 3, 4, 6].includes(Number(b.cadenceMul)) ? Number(b.cadenceMul) : 1;
   if (!b.acceptTerms) return fail("please accept the risk disclosure");
 
   const sql = db();

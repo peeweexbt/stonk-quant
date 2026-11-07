@@ -1,4 +1,5 @@
-import { sql, logEvent } from "./db";
+import { sql, logEvent, setEventHook } from "./db";
+import { notifyOwner, pollTelegram } from "./telegram";
 import { env } from "./env";
 import { migrate } from "./migrate";
 import { market } from "./market";
@@ -108,6 +109,12 @@ async function main() {
   setInterval(discoveryLoop, Math.max(30, env.discovery.intervalSec) * 1000);
   fastLoop();
   // score v1 vs v2 on real history a few minutes after boot, then every few hours
+  // Telegram alerts (only when TELEGRAM_BOT_TOKEN is set)
+  if (env.telegram.token) {
+    setEventHook(notifyOwner);
+    setInterval(pollTelegram, 4_000);
+    console.log("[telegram] alerts on");
+  }
   setTimeout(backtestLoop, 3 * 60_000);
   setInterval(backtestLoop, Math.max(1, env.backtestEveryHours) * 3600_000);
 }
