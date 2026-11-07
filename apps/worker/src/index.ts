@@ -92,7 +92,7 @@ async function backtestLoop() {
 }
 
 async function main() {
-  console.log(`stonk-quant worker starting. engine real=${env.engine.real} sim=${env.engine.sim}. trading=${env.tradingEnabled} withdrawals=${env.withdrawalsEnabled} jupiter=${env.jupiter.baseUrl}`);
+  console.log(`stock-quant worker starting. engine real=${env.engine.real} sim=${env.engine.sim}. trading=${env.tradingEnabled} withdrawals=${env.withdrawalsEnabled} jupiter=${env.jupiter.baseUrl}`);
   await migrate();
   await resetSimsIfNeeded();
   await ensureSimAgents();

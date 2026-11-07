@@ -8,4 +8,4 @@ export function restrictedCountry(req: Request): string | null {
 }
 
 export const RESTRICTED_MSG =
-  "Stonk Quant isn't available in your region. Tokenized stocks (xStocks and PreStocks) are not offered to persons in restricted jurisdictions.";
+  "Stock Quant isn't available in your region. Tokenized stocks (xStocks and PreStocks) are not offered to persons in restricted jurisdictions.";

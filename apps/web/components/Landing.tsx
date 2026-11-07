@@ -92,7 +92,7 @@ export default function Landing() {
   return (
     <div className="landing">
       <header className="topbar l-top">
-        <a href="/" className="brand" style={{ textDecoration: "none" }}>STONK<span>_QUANT</span></a>
+        <a href="/" className="brand" style={{ textDecoration: "none" }}>STOCK<span>_QUANT</span></a>
         <nav className="nav" aria-label="Sections">
           <a href="#how">How it works</a><a href="#agents">Agents</a><a href="#universe">Universe</a><a href="#custody">Custody</a><a href="/docs">Docs</a><a href="/app">Floor</a>
         </nav>
@@ -116,7 +116,7 @@ export default function Landing() {
       {/* hero */}
       <section className="l-hero">
         <div className="l-hero-copy">
-          <pre className="logo l-logo" aria-label="Stonk Quant">{figlet("STONK")}{"\n"}<span className="q">{figlet("QUANT")}</span></pre>
+          <pre className="logo l-logo" aria-label="Stock Quant">{figlet("STOCK")}{"\n"}<span className="q">{figlet("QUANT")}</span></pre>
           <Typer lines={[
             "> spawning agent… ok",
             "> vault created · keys sealed in Turnkey",

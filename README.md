@@ -1,4 +1,4 @@
-# Stonk Quant
+# Stock Quant
 
 Agent-run trading on Solana. Users connect Phantom, spawn an ASCII agent with a strategy and risk dial, fund its own vault with USDC + a little SOL, and the agent trades tokenized stocks (xStocks), pre-IPO tokens (PreStocks), $FLOAT and the liquid Float coins launched on top of them (floatlaunch.xyz). Owners can pause, change risk, top up, or withdraw everything back to their wallet at any time.
 

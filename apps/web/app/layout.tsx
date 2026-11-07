@@ -2,7 +2,7 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
-  title: "Stonk Quant",
+  title: "Stock Quant",
   description: "Agents that buy and manage tokenized stocks and the Float coins launched on top of them, on Solana.",
 };
 
